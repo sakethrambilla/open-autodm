@@ -9,6 +9,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --mode integration",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
@@ -19,13 +21,15 @@
     "@tanstack/react-query": "^5.90.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.0",
+    "inngest": "4.21.1",
     "jose": "^5.9.6",
     "lucide-react": "^0.544.0",
     "next": "^15.5.4",
     "next-themes": "^0.4.6",
-    "recharts": "^3.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-is": "^19.3.0",
+    "recharts": "^3.2.0",
     "tailwind-merge": "^3.3.0",
     "zod": "^3.25.0",
     "zustand": "^5.0.8"
@@ -38,6 +42,7 @@
     "@types/react-dom": "^19.1.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0",
+    "vitest": "3.2.7",
     "wrangler": "^4.20.0"
   }
 }

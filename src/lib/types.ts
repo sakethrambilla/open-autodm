@@ -92,12 +92,71 @@ export interface JobQueueRow {
   job_type: 'auto_dm' | 'follow_up';
   payload: AutoDmJobPayload;
   dedupe_key: string;
-  status: 'pending' | 'processing' | 'done' | 'failed';
+  status: JobStatus;
   run_after: string;
   attempts: number;
   max_attempts: number;
   last_error: string | null;
   locked_at: string | null;
+  inbox_id: string | null;
+  workflow_run_id: string | null;
+  publish_state: PublishState;
+  publish_generation: number;
+  publish_lease_until: string | null;
+  next_publish_at: string;
+  lease_owner: string | null;
+  lease_version: number;
+  lease_expires_at: string | null;
+  next_retry_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type JobStatus = 'pending' | 'processing' | 'suspended' | 'done' | 'failed' | 'skipped' | 'uncertain';
+export type PublishState = 'pending' | 'publishing' | 'published' | 'failed';
+
+// ── Durable inbox / outbound actions ────────────────────────────────────────
+
+/** One supported Meta event, split out of a webhook envelope. */
+export type NormalizedWebhookEvent =
+  | { kind: 'comment'; igAccountIgsid: string; entryTime: number; comment: MetaCommentChangeValue }
+  | { kind: 'message' | 'postback'; igAccountIgsid: string; messaging: MetaWebhookMessaging };
+
+export interface WebhookInboxRow {
+  id: string;
+  instagram_account_id: string;
+  event_key: string;
+  event_kind: NormalizedWebhookEvent['kind'];
+  payload: NormalizedWebhookEvent;
+  state: 'received' | 'processing' | 'processed' | 'ignored' | 'failed';
+  occurred_at: string | null;
+  received_at: string;
+  publish_state: PublishState;
+  publish_generation: number;
+  publish_lease_until: string | null;
+  next_publish_at: string;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OutboundActionState = 'pending' | 'dispatching' | 'accepted' | 'skipped' | 'failed' | 'uncertain';
+
+export interface OutboundActionRow {
+  id: string;
+  job_id: string;
+  instagram_account_id: string;
+  action_key: string;
+  action_kind: 'public_reply' | 'private_reply' | 'dm';
+  recipient_ref: string;
+  message_snapshot: Record<string, unknown>;
+  state: OutboundActionState;
+  provider_message_id: string | null;
+  dispatched_at: string | null;
+  next_attempt_at: string | null;
+  error_class: string | null;
+  last_error: string | null;
+  attempts: number;
   created_at: string;
   updated_at: string;
 }
@@ -144,7 +203,7 @@ export interface MetaWebhookMessaging {
   };
   read?: { watermark: number };
   delivery?: { watermark: number; seq?: number };
-  postback?: { payload: string; title: string };
+  postback?: { mid?: string; payload: string; title: string };
 }
 
 // ── Instagram OAuth responses ───────────────────────────────────────────────

@@ -6,6 +6,8 @@
  * Account-pause → policy/spam blocks; the circuit breaker pauses ALL sends
  *                 for the account instead of hammering Meta and risking the
  *                 creator's Instagram standing.
+ * Unknown outcome → timeout, reset or unreadable response: the message may
+ *                 have been delivered, so it must never be resent automatically.
  */
 
 /** Meta error codes that can never succeed on retry. */
@@ -54,4 +56,12 @@ export function classifyMetaError(message: string, code: number | undefined, sub
     return new NonRetryableMetaError(message, code, subcode);
   }
   return new MetaApiError(message, code, subcode);
+}
+
+/** The request may or may not have reached Meta - not an explicit rejection. */
+export class UnknownOutcomeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnknownOutcomeError';
+  }
 }

@@ -14,16 +14,18 @@
 
 import { createLogger } from '@/lib/logger';
 import { debugLog } from '@/lib/debugLog';
-import { classifyMetaError } from '@/lib/instagram/errors';
+import { classifyMetaError, UnknownOutcomeError } from '@/lib/instagram/errors';
 
 const logger = createLogger('instagram');
 
 export const META_API_VERSION = 'v23.0';
 const META_GRAPH_BASE = `https://graph.instagram.com/${META_API_VERSION}`;
+export const META_REQUEST_TIMEOUT_MS = 10_000;
 
 interface MetaSendMessageResponse {
-  recipient_id: string;
-  message_id: string;
+  recipient_id?: string;
+  message_id?: string;
+  id?: string;
 }
 
 interface MetaErrorResponse {
@@ -62,11 +64,45 @@ function recipientLabel(recipient: DmRecipient): string {
   return 'commentId' in recipient ? `comment ${recipient.commentId} (private reply)` : recipient.id;
 }
 
-function throwFromMetaResponse(context: string, status: number, body: MetaErrorResponse): never {
-  const code = body.error?.code;
-  const subcode = body.error?.error_subcode;
-  const message = body.error?.message ?? `Unknown Meta API error (${context}, HTTP ${status})`;
-  throw classifyMetaError(message, code, subcode);
+/**
+ * POSTs one send and returns Meta's message/comment ID. Throws a classified
+ * MetaApiError only when Meta explicitly rejected the request; a timeout,
+ * reset, unreadable body or 5xx without a specific error code throws
+ * UnknownOutcomeError because the message may already have been delivered.
+ */
+async function postSend(context: string, url: string, body: unknown): Promise<string> {
+  let res: Response;
+  let data: MetaSendMessageResponse & MetaErrorResponse;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(META_REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new UnknownOutcomeError(`${context}: no response from Meta (${err instanceof Error ? err.message : String(err)})`);
+  }
+  try {
+    data = (await res.json()) as MetaSendMessageResponse & MetaErrorResponse;
+  } catch {
+    throw new UnknownOutcomeError(`${context}: unreadable Meta response (HTTP ${res.status})`);
+  }
+
+  if (!res.ok) {
+    const code = data.error?.code;
+    logger.error({ context, status: res.status, metaCode: code, metaMessage: data.error?.message }, 'Meta send failed');
+    // Code 1 is Meta's generic "unknown error": no proof the send was rejected.
+    if (res.status >= 500 && (code === undefined || code === 1)) {
+      throw new UnknownOutcomeError(`${context}: Meta HTTP ${res.status} without a definite rejection`);
+    }
+    const message = data.error?.message ?? `Unknown Meta API error (${context}, HTTP ${res.status})`;
+    throw classifyMetaError(message, code, data.error?.error_subcode);
+  }
+
+  const id = data.message_id ?? data.id;
+  if (!id) throw new UnknownOutcomeError(`${context}: Meta accepted the request but returned no ID`);
+  return id;
 }
 
 /** Sends a text DM (optionally with a postback button via button template). */
@@ -107,31 +143,25 @@ export async function sendInstagramDm(
     messagePreview: messageText.slice(0, 80),
   });
 
-  const res = await fetch(`${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recipient: recipientJson(recipient), message: messageBody }),
-  });
-
-  const data = (await res.json()) as MetaSendMessageResponse & MetaErrorResponse;
-
-  if (!res.ok) {
-    logger.error(
-      { igAccountIgsid, recipient: to, status: res.status, metaCode: data.error?.code, metaMessage: data.error?.message },
-      'DM send failed'
-    );
+  let messageId: string;
+  try {
+    messageId = await postSend('sendInstagramDm', `${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, {
+      recipient: recipientJson(recipient),
+      message: messageBody,
+    });
+  } catch (err) {
     debugLog('instagram', 'error', 'dm_send_failed', 'error',
-      `DM to ${to} FAILED - Meta error ${data.error?.code}: ${data.error?.message ?? 'unknown'}`,
-      { igAccountIgsid, recipient: to, httpStatus: res.status, metaErrorCode: data.error?.code, fbtrace_id: data.error?.fbtrace_id });
-    throwFromMetaResponse('sendInstagramDm', res.status, data);
+      `DM to ${to} FAILED - ${err instanceof Error ? err.message : String(err)}`,
+      { igAccountIgsid, recipient: to });
+    throw err;
   }
 
-  debugLog('instagram', 'info', 'dm_sent', 'ok', `DM sent to ${to} - messageId=${data.message_id}`, {
+  debugLog('instagram', 'info', 'dm_sent', 'ok', `DM sent to ${to} - messageId=${messageId}`, {
     igAccountIgsid,
     recipient: to,
-    messageId: data.message_id,
+    messageId,
   });
-  return data.message_id;
+  return messageId;
 }
 
 /**
@@ -139,8 +169,9 @@ export async function sendInstagramDm(
  * far cleaner than pasting a raw URL into the text.
  *
  * IMPORTANT (learned from production tools): Meta occasionally rejects button
- * templates for certain recipients/URL combinations. Callers should catch
- * MetaApiError and fall back to sendInstagramDm with the link inline.
+ * templates for certain recipients/URL combinations. Callers should catch an
+ * explicit MetaApiError (never UnknownOutcomeError) and fall back to
+ * sendInstagramDm with the link inline.
  */
 export async function sendInstagramLinkButtonDm(
   igAccountIgsid: string,
@@ -171,50 +202,44 @@ export async function sendInstagramLinkButtonDm(
     buttonTitle,
   });
 
-  const res = await fetch(`${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  const data = (await res.json()) as MetaSendMessageResponse & MetaErrorResponse;
-  if (!res.ok) {
+  let messageId: string;
+  try {
+    messageId = await postSend('sendInstagramLinkButtonDm', `${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, body);
+  } catch (err) {
     debugLog('instagram', 'warn', 'link_button_dm_failed', 'error',
-      `Link-button DM to ${to} rejected - ${data.error?.code}: ${data.error?.message ?? 'unknown'} (caller falls back to inline link)`,
-      { igAccountIgsid, recipient: to, httpStatus: res.status, metaErrorCode: data.error?.code });
-    throwFromMetaResponse('sendInstagramLinkButtonDm', res.status, data);
+      `Link-button DM to ${to} failed - ${err instanceof Error ? err.message : String(err)}`,
+      { igAccountIgsid, recipient: to });
+    throw err;
   }
 
-  debugLog('instagram', 'info', 'link_button_dm_sent', 'ok', `Link-button DM sent to ${to} - messageId=${data.message_id}`, {
+  debugLog('instagram', 'info', 'link_button_dm_sent', 'ok', `Link-button DM sent to ${to} - messageId=${messageId}`, {
     igAccountIgsid,
     recipient: to,
-    messageId: data.message_id,
+    messageId,
   });
-  return data.message_id;
+  return messageId;
 }
 
-/** Posts a public reply to a comment. Non-fatal - DM still sends on failure. */
-export async function replyToComment(commentId: string, replyText: string, accessToken: string): Promise<void> {
+/** Posts a public reply to a comment and returns the reply's comment ID. */
+export async function replyToComment(commentId: string, replyText: string, accessToken: string): Promise<string> {
   debugLog('instagram', 'info', 'comment_reply_attempt', 'processing', `Replying to comment ${commentId}`, {
     commentId,
     replyPreview: replyText.slice(0, 80),
   });
 
-  const res = await fetch(`${META_GRAPH_BASE}/${commentId}/replies`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: replyText, access_token: accessToken }),
-  });
-
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as MetaErrorResponse;
-    logger.warn({ commentId, status: res.status, metaCode: body.error?.code }, 'Comment reply failed - continuing');
+  let replyId: string;
+  try {
+    replyId = await postSend('replyToComment', `${META_GRAPH_BASE}/${commentId}/replies`, {
+      message: replyText,
+      access_token: accessToken,
+    });
+  } catch (err) {
     debugLog('instagram', 'warn', 'comment_reply_failed', 'error',
-      `Comment reply to ${commentId} failed - ${body.error?.code}: ${body.error?.message ?? 'unknown'} (DM will still send)`,
-      { commentId, httpStatus: res.status });
-  } else {
-    debugLog('instagram', 'info', 'comment_reply_sent', 'ok', `Public reply posted to comment ${commentId}`, { commentId });
+      `Comment reply to ${commentId} failed - ${err instanceof Error ? err.message : String(err)}`, { commentId });
+    throw err;
   }
+  debugLog('instagram', 'info', 'comment_reply_sent', 'ok', `Public reply posted to comment ${commentId}`, { commentId });
+  return replyId;
 }
 
 /** Sends the ask-to-follow generic template (Visit Profile + confirm postback). */
@@ -262,25 +287,21 @@ export async function sendAskToFollowDm(
     },
   };
 
-  const res = await fetch(`${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  const data = (await res.json()) as MetaSendMessageResponse & MetaErrorResponse;
-  if (!res.ok) {
+  let messageId: string;
+  try {
+    messageId = await postSend('sendAskToFollowDm', `${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, body);
+  } catch (err) {
     debugLog('instagram', 'error', 'ask_follow_dm_failed', 'error',
-      `Ask-to-follow DM to ${recipientIgsid} FAILED - ${data.error?.code}: ${data.error?.message ?? 'unknown'}`,
-      { igAccountIgsid, recipientIgsid, httpStatus: res.status });
-    throwFromMetaResponse('sendAskToFollowDm', res.status, data);
+      `Ask-to-follow DM to ${recipientIgsid} FAILED - ${err instanceof Error ? err.message : String(err)}`,
+      { igAccountIgsid, recipientIgsid });
+    throw err;
   }
   debugLog('instagram', 'info', 'ask_follow_dm_sent', 'ok', `Ask-to-follow DM sent to ${recipientIgsid}`, {
     igAccountIgsid,
     recipientIgsid,
-    messageId: data.message_id,
+    messageId,
   });
-  return data.message_id;
+  return messageId;
 }
 
 /** Sends a card (generic template) DM with image/title/subtitle/URL buttons. */
@@ -303,28 +324,24 @@ export async function sendInstagramCardDm(
     }));
   }
 
-  const res = await fetch(`${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  let messageId: string;
+  try {
+    messageId = await postSend('sendInstagramCardDm', `${META_GRAPH_BASE}/${igAccountIgsid}/messages?access_token=${accessToken}`, {
       recipient: { id: recipientIgsid },
       message: { attachment: { type: 'template', payload: { template_type: 'generic', elements: [element] } } },
-    }),
-  });
-
-  const data = (await res.json()) as MetaSendMessageResponse & MetaErrorResponse;
-  if (!res.ok) {
+    });
+  } catch (err) {
     debugLog('instagram', 'error', 'card_dm_failed', 'error',
-      `Card DM to ${recipientIgsid} FAILED - ${data.error?.code}: ${data.error?.message ?? 'unknown'}`,
-      { igAccountIgsid, recipientIgsid, httpStatus: res.status });
-    throwFromMetaResponse('sendInstagramCardDm', res.status, data);
+      `Card DM to ${recipientIgsid} FAILED - ${err instanceof Error ? err.message : String(err)}`,
+      { igAccountIgsid, recipientIgsid });
+    throw err;
   }
   debugLog('instagram', 'info', 'card_dm_sent', 'ok', `Card DM sent to ${recipientIgsid}`, {
     igAccountIgsid,
     recipientIgsid,
-    messageId: data.message_id,
+    messageId,
   });
-  return data.message_id;
+  return messageId;
 }
 
 /**
@@ -344,7 +361,8 @@ export async function getAudienceProfile(
 ): Promise<AudienceProfile | null> {
   try {
     const res = await fetch(
-      `${META_GRAPH_BASE}/${audienceIgsid}?fields=username,is_user_follow_business&access_token=${accessToken}`
+      `${META_GRAPH_BASE}/${audienceIgsid}?fields=username,is_user_follow_business&access_token=${accessToken}`,
+      { signal: AbortSignal.timeout(META_REQUEST_TIMEOUT_MS) }
     );
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as MetaErrorResponse;

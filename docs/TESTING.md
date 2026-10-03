@@ -72,7 +72,7 @@ The automation card's **Total DMs Sent** counter increments.
 
 - Comment `TEST` **again from the same account** → debug shows `dedup_check SKIPPED` - no second DM. ✅
 - Comment from your own connected account → `comment_event SKIPPED (self)`. ✅
-- Hit `https://YOUR_APP/api/cron/process-jobs` with header `Authorization: Bearer YOUR_CRON_SECRET` → returns `{"ok":true,...}`. ✅
+- `POST https://YOUR_APP/api/cron/process-jobs` with header `Authorization: Bearer YOUR_CRON_SECRET` → returns `{"ok":true,...}`; GET and query-string secrets are rejected. ✅
 
 ---
 

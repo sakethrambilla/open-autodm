@@ -17,6 +17,10 @@ const serverEnvSchema = z.object({
     .string()
     .regex(/^[0-9a-f]{64}$/i, 'TOKEN_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes)'),
   CRON_SECRET: z.string().min(16, 'CRON_SECRET must be at least 16 characters'),
+  // Read by the Inngest SDK itself; validated here so a misconfigured deploy fails loudly.
+  INNGEST_EVENT_KEY: z.string().min(1).optional(),
+  INNGEST_SIGNING_KEY: z.string().regex(/^signkey-[a-z]+-[0-9a-f]+$/i, 'INNGEST_SIGNING_KEY must look like signkey-<env>-<hex>').optional(),
+  AUTODM_DRY_RUN: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
 });
 
 const publicEnvSchema = z.object({
@@ -36,6 +40,9 @@ export function getEnv(): ServerEnv {
     SUPABASE_SERVICE_ROLE_KEY: process.env['SUPABASE_SERVICE_ROLE_KEY'],
     TOKEN_ENCRYPTION_KEY: process.env['TOKEN_ENCRYPTION_KEY'],
     CRON_SECRET: process.env['CRON_SECRET'],
+    INNGEST_EVENT_KEY: process.env['INNGEST_EVENT_KEY'] || undefined,
+    INNGEST_SIGNING_KEY: process.env['INNGEST_SIGNING_KEY'] || undefined,
+    AUTODM_DRY_RUN: process.env['AUTODM_DRY_RUN'] || undefined,
   });
 
   const publicResult = publicEnvSchema.safeParse({
@@ -51,6 +58,9 @@ export function getEnv(): ServerEnv {
   if (!publicResult.success) {
     issues.push(...publicResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
   }
+  if (serverResult.success && isInngestCloud() && (!serverResult.data.INNGEST_EVENT_KEY || !serverResult.data.INNGEST_SIGNING_KEY)) {
+    issues.push('INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY are required in production (set INNGEST_DEV=1 only for a local dev server)');
+  }
   if (issues.length > 0) {
     throw new Error(
       `[open-autoDM] Invalid or missing environment variables:\n  - ${issues.join('\n  - ')}\n` +
@@ -60,6 +70,11 @@ export function getEnv(): ServerEnv {
 
   cached = { ...serverResult.data!, ...publicResult.data! } as ServerEnv;
   return cached;
+}
+
+/** True when Inngest runs against Inngest Cloud, where requests must be signed. */
+export function isInngestCloud(): boolean {
+  return process.env['NODE_ENV'] === 'production' && !process.env['INNGEST_DEV'];
 }
 
 /**

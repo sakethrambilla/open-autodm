@@ -86,11 +86,19 @@ Copy the `*.workers.dev` URL, set it as `NEXT_PUBLIC_APP_URL` in `wrangler.jsonc
 
 ## Part 5 - Background engine (2 min)
 
-In the wizard's Step 4 you'll find a ready-made SQL snippet. Open **Supabase → SQL Editor**,
-replace `YOUR_CRON_SECRET` with your actual `CRON_SECRET`, run it. This schedules a
-once-a-minute call to your deployment that processes delayed jobs and auto-refreshes tokens.
+Sends run on Inngest: set `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in your deployment env
+and sync the app at `https://YOUR_APP/api/inngest` in the Inngest dashboard.
 
-Verify: `select * from cron.job;` → you should see `open-autodm-process-jobs`.
+In the wizard's Step 4 you'll find a ready-made SQL snippet. Open **Supabase → SQL Editor**,
+replace `YOUR_CRON_SECRET` with your actual `CRON_SECRET` (it is stored once in Supabase Vault,
+not in the schedules), run it. It creates three schedules, each a `POST` with
+`Authorization: Bearer <secret>`:
+
+- `open-autodm-process-jobs` - every 5 min, `/api/cron/process-jobs` (recovers and republishes stalled work)
+- `open-autodm-token-refresh` - hourly, `/api/cron/maintenance` with `{"mode":"refresh"}`
+- `open-autodm-cleanup` - daily, `/api/cron/maintenance` with `{"mode":"cleanup"}`
+
+Re-running the snippet is safe. Verify: `select jobname, schedule from cron.job;` → all three names.
 
 ## Part 6 - Connect Instagram + first automation (5 min)
 

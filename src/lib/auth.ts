@@ -6,12 +6,16 @@
  *   1. Authorization: Bearer <jwt>  (used by the in-app API client)
  *   2. Supabase session cookies     (used by top-level browser navigations,
  *      e.g. the OAuth connect redirect)
+ *
+ * Cron endpoints are separate: Supabase pg_cron sends Authorization: Bearer
+ * CRON_SECRET, checked by isCronAuthorized.
  */
 
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getEnv } from '@/lib/env';
+import { safeCompare } from '@/lib/crypto';
 
 export interface AuthenticatedUser {
   id: string;
@@ -49,4 +53,12 @@ export async function getAuthenticatedUser(request: Request): Promise<Authentica
 
 export function unauthorized(): Response {
   return Response.json({ error: 'Unauthorized', message: 'Valid session required' }, { status: 401 });
+}
+
+/** Constant-time check of the scheduler's Authorization header; query-string secrets are not accepted. */
+export function isCronAuthorized(request: Request): boolean {
+  const header = request.headers.get('authorization') ?? '';
+  if (!header.startsWith('Bearer ')) return false;
+  const provided = header.slice(7);
+  return provided.length > 0 && safeCompare(provided, getEnv().CRON_SECRET);
 }

@@ -257,8 +257,8 @@ export default function SetupPage() {
             {/* Step 4 */}
             <StepCard step={4} title="Enable the background engine" icon={Clock3}>
                 <p className="text-[13px] text-muted-foreground mb-3 leading-relaxed">
-                    Most DMs send instantly from the webhook. This cron delivers the rest - rate-limited overflow,
-                    retries, and automatic token refresh. In <b>Supabase → SQL Editor</b>, replace{" "}
+                    Supabase cron recovers interrupted or delayed work every five minutes, refreshes tokens
+                    hourly and prunes old data daily. In <b>Supabase → SQL Editor</b>, replace{" "}
                     <code className="font-mono text-[11px] bg-muted px-1 rounded">YOUR_CRON_SECRET</code> with your
                     deployment&apos;s CRON_SECRET and run:
                 </p>
@@ -275,7 +275,7 @@ export default function SetupPage() {
                     </button>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-2">
-                    Verify with <code className="font-mono bg-muted px-1 rounded">select * from cron.job;</code> - you should see <code className="font-mono bg-muted px-1 rounded">open-autodm-process-jobs</code>.
+                    Verify with <code className="font-mono bg-muted px-1 rounded">select * from cron.job;</code> - you should see exactly one each of <code className="font-mono bg-muted px-1 rounded">open-autodm-process-jobs</code>, <code className="font-mono bg-muted px-1 rounded">open-autodm-token-refresh</code> and <code className="font-mono bg-muted px-1 rounded">open-autodm-cleanup</code>.
                 </p>
             </StepCard>
 

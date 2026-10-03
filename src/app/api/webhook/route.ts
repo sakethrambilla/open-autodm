@@ -4,22 +4,22 @@
  * GET  → subscription verification challenge (Meta portal setup)
  * POST → live events (comments, DMs, postbacks)
  *
- * Non-negotiable contract with Meta:
- *  1. HMAC-SHA256 signature verified over the RAW body BEFORE any processing.
- *     Invalid → 403 immediately. No DB queries before this check.
- *  2. 200 returned within 5 seconds. All real work happens in `after()` -
- *     the response is sent first, processing continues in the background of
- *     the same invocation (supported on Vercel and Cloudflare via OpenNext).
+ * Contract with Meta:
+ *  1. Body size is bounded and the HMAC-SHA256 signature is verified over the
+ *     RAW bytes before anything else. Invalid → 403, no database writes.
+ *  2. Each supported event is stored in webhook_inbox before 200 is returned.
+ *     Storage failure → 5xx so Meta redelivers; duplicates are 200 no-ops.
+ *  3. The receiver never matches campaigns or calls Meta. Stored events are
+ *     published by ID for durable processing; anything left unpublished is
+ *     picked up by recovery.
  */
 
-import { after } from 'next/server';
 import { getMetaSettings } from '@/lib/settings';
 import { hmacSha256Hex, safeCompare } from '@/lib/crypto';
-import { processWebhookPayload } from '@/lib/automation/processWebhook';
-import { processDueJobs } from '@/lib/automation/engine';
+import { extractEvents, MAX_WEBHOOK_BODY_BYTES, publishInboxEvents, storeInboxEvents } from '@/lib/automation/inbox';
+import '@/lib/inngest/client'; // registers the Inngest inbox publisher
 import { createLogger } from '@/lib/logger';
 import { debugLog } from '@/lib/debugLog';
-import type { MetaWebhookBody } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,11 +51,18 @@ export async function GET(request: Request): Promise<Response> {
 // ── POST /api/webhook - live events ─────────────────────────────────────────
 export async function POST(request: Request): Promise<Response> {
   const signature = request.headers.get('x-hub-signature-256');
-  const rawBody = await request.text();
+  const declaredLength = Number(request.headers.get('content-length') ?? 0);
+  if (declaredLength > MAX_WEBHOOK_BODY_BYTES) {
+    return Response.json({ error: 'Payload too large' }, { status: 413 });
+  }
+  const bodyBuffer = Buffer.from(await request.arrayBuffer());
+  if (bodyBuffer.byteLength > MAX_WEBHOOK_BODY_BYTES) {
+    return Response.json({ error: 'Payload too large' }, { status: 413 });
+  }
 
   debugLog('webhook', 'info', 'webhook_received', 'processing', 'POST /api/webhook received from Meta', {
     hasSignature: !!signature,
-    bytes: rawBody.length,
+    bytes: bodyBuffer.byteLength,
   });
 
   if (!signature) {
@@ -76,7 +83,6 @@ export async function POST(request: Request): Promise<Response> {
   const signingSecrets = [settings.metaAppSecret, settings.metaFbAppSecret].filter(
     (s): s is string => Boolean(s)
   );
-  const bodyBuffer = Buffer.from(rawBody, 'utf8');
   const signatureValid = signingSecrets.some((secret) =>
     safeCompare(signature, `sha256=${hmacSha256Hex(secret, bodyBuffer)}`)
   );
@@ -91,28 +97,35 @@ export async function POST(request: Request): Promise<Response> {
 
   debugLog('webhook', 'info', 'signature_check', 'ok', 'HMAC-SHA256 signature verified', {});
 
-  let body: MetaWebhookBody;
+  let events;
   try {
-    body = JSON.parse(rawBody) as MetaWebhookBody;
+    events = extractEvents(JSON.parse(bodyBuffer.toString('utf8')));
   } catch {
-    // Signed but unparseable - acknowledge so Meta doesn't retry forever.
+    events = null;
+  }
+  if (!events) {
+    // Signed but malformed - acknowledge so Meta doesn't retry forever.
     return Response.json({ status: 'ignored' }, { status: 200 });
   }
 
-  // All heavy lifting AFTER the 200 is on the wire.
-  after(async () => {
-    try {
-      const enqueued = await processWebhookPayload(body);
-      // Fast path: drain what we just enqueued (plus any other due jobs).
-      if (enqueued > 0) {
-        await processDueJobs(Math.max(enqueued, 5));
-      }
-    } catch (err) {
-      logger.error({ err }, 'Webhook background processing failed (200 already sent)');
-      debugLog('webhook', 'error', 'payload_processing', 'error',
-        `Unhandled error during background processing: ${err instanceof Error ? err.message : String(err)}`, {});
-    }
-  });
+  let receipt;
+  try {
+    receipt = await storeInboxEvents(events);
+  } catch (err) {
+    logger.error({ err }, 'Webhook inbox persistence failed - returning 5xx for redelivery');
+    debugLog('webhook', 'error', 'inbox_store', 'error',
+      `Inbox persistence failed: ${err instanceof Error ? err.message : String(err)}`, {});
+    return Response.json({ error: 'Storage unavailable' }, { status: 503 });
+  }
+
+  if (receipt.unknownAccount > 0) {
+    debugLog('webhook', 'warn', 'ig_account_lookup', 'skipped', `${receipt.unknownAccount} event(s) for unknown or inactive IG accounts ignored`, {
+      hint: 'Meta console "Test" button sends entry.id=0 (fake) - real comments from the connected account are required.',
+    });
+  }
+  debugLog('webhook', 'info', 'inbox_store', 'ok', `Stored ${receipt.stored.length} event(s), ${receipt.duplicates} duplicate(s)`, {});
+
+  await publishInboxEvents(receipt.stored.map((r) => ({ inboxId: r.id, instagramAccountId: r.instagramAccountId })));
 
   return Response.json({ status: 'ok' }, { status: 200 });
 }

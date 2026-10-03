@@ -6,7 +6,8 @@
  * Only rendered when NEXT_PUBLIC_DEBUG=true (add to .env.local).
  * Polls /debug/events every 2.5 seconds.
  * Shows every step from webhook received → signature check → account lookup
- * → keyword match → job enqueue → DM sent → session complete.
+ * → keyword match → job enqueue → DM sent → session complete, plus the
+ * owner's failed/uncertain/delayed inbox, job and send-action rows.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -23,6 +24,105 @@ interface DebugEvent {
   status: string;
   message: string;
   metadata: Record<string, unknown>;
+}
+
+interface StateRow {
+  id: string;
+  state?: string;
+  status?: string;
+  publish_state?: string;
+  publish_generation?: number;
+  event_kind?: string;
+  job_type?: string;
+  action_kind?: string;
+  error_class?: string | null;
+  attempts?: number;
+  last_error?: string | null;
+  next_publish_at?: string | null;
+  run_after?: string | null;
+  next_retry_at?: string | null;
+  next_attempt_at?: string | null;
+  provider_message_id?: string | null;
+  updated_at: string;
+}
+
+interface DebugResponse {
+  events: DebugEvent[];
+  inbox?: StateRow[];
+  jobs?: StateRow[];
+  actions?: StateRow[];
+}
+
+// Provider acceptance is not proof the recipient saw the message.
+const ACTION_LABELS: Record<string, string> = {
+  accepted:    "accepted by Instagram",
+  uncertain:   "uncertain - not resent",
+  dispatching: "dispatching",
+  pending:     "pending",
+  failed:      "failed",
+  skipped:     "skipped",
+};
+
+const STATE_STYLES: Record<string, string> = {
+  accepted:  "text-emerald-300",
+  failed:    "text-red-300",
+  uncertain: "text-amber-300",
+  suspended: "text-blue-300",
+};
+
+// Matches the publication cap in the recovery RPCs.
+const PUBLISH_GIVE_UP_GENERATION = 20;
+
+function describeRow(kind: "inbox" | "job" | "action", r: StateRow): { label: string; state: string; detail: string } {
+  if (kind === "action") {
+    const state = r.state ?? "";
+    const retry = state === "pending" && r.next_attempt_at ? ` · retry ${formatTime(r.next_attempt_at)}` : "";
+    return {
+      label: `action ${r.action_kind ?? ""}`,
+      state,
+      detail: `${ACTION_LABELS[state] ?? state} · attempts ${r.attempts ?? 0}${r.error_class ? ` · ${r.error_class}` : ""}${retry}`,
+    };
+  }
+  const state = (kind === "inbox" ? r.state : r.status) ?? "";
+  const gaveUp = (r.publish_generation ?? 0) >= PUBLISH_GIVE_UP_GENERATION;
+  const publish = gaveUp ? "publish gave up" : `publish ${r.publish_state ?? ""} #${r.publish_generation ?? 0}`;
+  const dueAt = kind === "inbox" ? r.next_publish_at : (r.next_retry_at ?? r.run_after);
+  return {
+    label: kind === "inbox" ? `inbox ${r.event_kind ?? ""}` : `job ${r.job_type ?? ""}`,
+    state: gaveUp ? "failed" : state,
+    detail: `${state} · ${publish}${dueAt ? ` · due ${formatTime(dueAt)}` : ""}`,
+  };
+}
+
+function ProcessingState({ inbox, jobs, actions }: { inbox: StateRow[]; jobs: StateRow[]; actions: StateRow[] }) {
+  const rows = [
+    ...inbox.map(r => ({ kind: "inbox" as const, r })),
+    ...jobs.map(r => ({ kind: "job" as const, r })),
+    ...actions.map(r => ({ kind: "action" as const, r })),
+  ];
+  if (rows.length === 0) return null;
+  return (
+    <div className="px-3 py-2 border-b border-zinc-700/60 max-h-[200px] overflow-y-auto space-y-0.5">
+      <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-500 px-2 pb-1">
+        Processing state (failed · uncertain · delayed · recent sends)
+      </p>
+      {rows.map(({ kind, r }) => {
+        const d = describeRow(kind, r);
+        return (
+          <div key={`${kind}-${r.id}`} className="flex items-start gap-2 flex-wrap px-2 py-1 rounded-md hover:bg-zinc-800/40">
+            <span className="text-[10px] text-zinc-600 shrink-0 w-[68px]">{formatTime(r.updated_at)}</span>
+            <span className="text-[10px] text-zinc-400 shrink-0">{d.label}</span>
+            <span className={cn("text-[10px] font-bold shrink-0", STATE_STYLES[d.state] ?? "text-zinc-400")}>
+              {d.detail}
+            </span>
+            {r.last_error && (
+              <span className="text-[11px] text-zinc-300 flex-1 min-w-0 break-words">{r.last_error}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 const LEVEL_STYLES: Record<string, string> = {
@@ -81,6 +181,7 @@ export function AutomationDebugPanel(): React.ReactElement | null {
 
 function DebugPanelInner(): React.ReactElement {
   const [events, setEvents] = useState<DebugEvent[]>([]);
+  const [processing, setProcessing] = useState<{ inbox: StateRow[]; jobs: StateRow[]; actions: StateRow[] }>({ inbox: [], jobs: [], actions: [] });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLive, setIsLive] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
@@ -92,9 +193,10 @@ function DebugPanelInner(): React.ReactElement {
 
   const fetchEvents = useCallback(async (): Promise<void> => {
     try {
-      const res = await apiClient<{ events: DebugEvent[] }>("/debug/events");
+      const res = await apiClient<DebugResponse>("/debug/events");
       // API returns newest first; we display oldest first (append-style log)
       setEvents(res.events.slice().reverse());
+      setProcessing({ inbox: res.inbox ?? [], jobs: res.jobs ?? [], actions: res.actions ?? [] });
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
@@ -203,6 +305,8 @@ function DebugPanelInner(): React.ReactElement {
           </div>
         )}
       </div>
+
+      {!isCollapsed && <ProcessingState {...processing} />}
 
       {/* Event list */}
       {!isCollapsed && (

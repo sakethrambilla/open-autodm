@@ -1,10 +1,12 @@
 /**
- * Webhook payload processing - routes Meta events to queue jobs.
+ * Stored webhook event processing - routes one normalized Meta event to queue jobs.
  *
- * Runs AFTER the 200 response has been sent to Meta (via `after()`), so
- * nothing here is latency-critical. Ported 1:1 from the proven receiver:
+ * Called with a webhook_inbox row's event, never from the HTTP receiver. A
+ * stored event may be replayed, so every write is idempotent: job creation
+ * reports created vs. existing IDs and database errors are thrown so the
+ * caller can retry instead of silently dropping work.
  *
- *  comment events → keyword/post match → auto_dm job
+ *  comment events → keyword/post match → one auto_dm job per account/comment
  *  DM events      → quick-reply/postback session routing → follow_up job
  *                 → story replies (message.reply_to.story) → story_reply keyword match
  *                 → plain DMs → dm_reply keyword match
@@ -14,13 +16,13 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { createLogger } from '@/lib/logger';
 import { debugLog } from '@/lib/debugLog';
 import { keywordMatches } from '@/lib/automation/keywordMatch';
-import { enqueueJob } from '@/lib/automation/queue';
+import { enqueueJob, type EnqueueResult } from '@/lib/automation/queue';
 import { recordContactInteraction } from '@/lib/automation/contacts';
 import type {
-  MetaWebhookBody,
   MetaCommentChangeValue,
   MetaWebhookMessaging,
   AutoDmJobPayload,
+  NormalizedWebhookEvent,
 } from '@/lib/types';
 
 const logger = createLogger('webhook');
@@ -28,85 +30,49 @@ const logger = createLogger('webhook');
 /** Max event age accepted for processing: 24h window + 1h queue buffer. */
 const MAX_EVENT_AGE_MS = 25 * 60 * 60 * 1000;
 
-export async function processWebhookPayload(body: MetaWebhookBody): Promise<number> {
-  if (body.object !== 'instagram') {
-    debugLog('webhook', 'info', 'payload_routing', 'skipped', `Webhook object "${body.object}" is not instagram - ignoring`, {});
-    return 0;
+export interface ProcessEventResult {
+  created: string[];
+  existing: string[];
+}
+
+function emptyResult(): ProcessEventResult {
+  return { created: [], existing: [] };
+}
+
+function addJob(result: ProcessEventResult, job: EnqueueResult): void {
+  (job.status === 'created' ? result.created : result.existing).push(job.id);
+}
+
+export async function processInboxEvent(
+  instagramAccountId: string,
+  event: NormalizedWebhookEvent,
+  inboxId: string | null = null
+): Promise<ProcessEventResult> {
+  if (event.kind === 'comment') {
+    return processCommentEvent(instagramAccountId, event.igAccountIgsid, event.comment, event.entryTime, inboxId);
   }
-
-  debugLog('webhook', 'info', 'payload_routing', 'ok', `Processing instagram webhook - ${body.entry.length} entr${body.entry.length === 1 ? 'y' : 'ies'}`, {
-    entryIds: body.entry.map((e) => e.id),
-  });
-
-  const db = createServiceClient();
-  let enqueued = 0;
-
-  for (const entry of body.entry) {
-    debugLog('webhook', 'info', 'entry_processing', 'processing', `Entry for IG account ${entry.id}`, {
-      entryId: entry.id,
-      changeFields: entry.changes?.map((c) => c.field) ?? [],
-      messagingCount: entry.messaging?.length ?? 0,
-    });
-
-    const { data: igAccount, error } = await db
-      .from('instagram_accounts')
-      .select('id, instagram_user_id')
-      .eq('instagram_user_id', entry.id)
-      .eq('is_active', true)
-      .single();
-
-    if (error || !igAccount) {
-      debugLog('webhook', 'warn', 'ig_account_lookup', 'skipped', `No active IG account for entry.id=${entry.id}`, {
-        entryId: entry.id,
-        hint: 'Meta console "Test" button sends entry.id=0 (fake) - real comments from the connected account are required.',
-      });
-      continue;
-    }
-
-    if (entry.changes?.length) {
-      for (const change of entry.changes) {
-        if (change.field === 'comments') {
-          enqueued += await processCommentEvent(igAccount.id as string, entry.id, change.value, entry.time);
-        } else {
-          debugLog('webhook', 'info', 'change_field_ignored', 'skipped', `Ignoring change field "${change.field}"`, {
-            field: change.field,
-          });
-        }
-      }
-    } else if (!entry.messaging?.length) {
-      debugLog('webhook', 'warn', 'entry_empty', 'skipped', `Entry ${entry.id} has no changes and no messaging`, {
-        hint: 'Likely a read-receipt or unsupported event. Check the per-account subscription includes "comments".',
-      });
-    }
-
-    if (entry.messaging) {
-      for (const messaging of entry.messaging) {
-        enqueued += await processDmEvent(igAccount.id as string, entry.id, messaging);
-      }
-    }
-  }
-
-  return enqueued;
+  return processDmEvent(instagramAccountId, event.igAccountIgsid, event.messaging, inboxId);
 }
 
 async function processCommentEvent(
   instagramAccountId: string,
   igAccountIgsid: string,
   comment: MetaCommentChangeValue,
-  entryTime: number
-): Promise<number> {
+  entryTime: number,
+  inboxId: string | null
+): Promise<ProcessEventResult> {
   // Only top-level comments trigger - replies are ignored (incl. our own replies)
   if (comment.parent_id) {
     debugLog('webhook', 'info', 'comment_event', 'skipped', `Comment ${comment.id} is a reply - ignored`, {
       commentId: comment.id,
     });
-    return 0;
+    return emptyResult();
   }
 
   // Never react to the account's own comments (self-trigger loop guard)
   if (comment.from.id === igAccountIgsid) {
     debugLog('webhook', 'info', 'comment_event', 'skipped', 'Comment authored by the connected account itself - ignored', {});
-    return 0;
+    return emptyResult();
   }
 
   // Meta may omit comment.timestamp on IG comment webhooks - fall back to entry.time
@@ -123,7 +89,7 @@ async function processCommentEvent(
 
   if (eventAgeMs > MAX_EVENT_AGE_MS) {
     debugLog('webhook', 'warn', 'window_check', 'skipped', `Comment ${Math.round(eventAgeMs / 3600000)}h old - beyond processing window`, {});
-    return 0;
+    return emptyResult();
   }
 
   const db = createServiceClient();
@@ -132,23 +98,24 @@ async function processCommentEvent(
     .select('id, post_id, keywords')
     .eq('instagram_account_id', instagramAccountId)
     .eq('type', 'comment_dm')
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) {
     debugLog('webhook', 'error', 'automations_fetch', 'error', `DB error fetching automations: ${error.message}`, {});
-    return 0;
+    throw new Error(`automations fetch failed: ${error.message}`);
   }
   if (!automations?.length) {
     debugLog('webhook', 'info', 'automations_fetch', 'skipped', 'No active comment_dm automations for this account', {});
-    return 0;
+    return emptyResult();
   }
 
   debugLog('webhook', 'info', 'automations_fetch', 'ok', `Checking ${automations.length} active automation(s)`, {
     automationIds: automations.map((a) => a.id),
   });
 
-  let enqueued = 0;
-  let capturedAutomationId: string | null = null;
+  const result = emptyResult();
   for (const automation of automations) {
     if (automation.post_id && automation.post_id !== comment.media.id) {
       debugLog('webhook', 'info', 'post_filter', 'skipped', `Automation ${automation.id}: different post`, {
@@ -183,39 +150,39 @@ async function processCommentEvent(
       messageText: null,
     };
 
-    const jobId = await enqueueJob('auto_dm', payload, `event_${automation.id}_${comment.id}`);
-    if (jobId) {
-      enqueued += 1;
-      capturedAutomationId = capturedAutomationId ?? (automation.id as string);
-      debugLog('webhook', 'info', 'job_enqueued', 'ok', `AutoDM job enqueued - ${jobId}`, { jobId });
+    // Keyed by account/comment, not automation: overlapping campaigns get one initial private reply (oldest wins).
+    const job = await enqueueJob('auto_dm', payload, `comment_${instagramAccountId}_${comment.id}`, inboxId);
+    addJob(result, job);
+    debugLog('webhook', 'info', 'job_enqueued', job.status === 'created' ? 'ok' : 'skipped',
+      `AutoDM job ${job.status === 'created' ? 'enqueued' : 'already exists'} - ${job.id}`, { jobId: job.id });
+    if (job.status === 'created') {
+      recordContactInteraction({
+        instagramAccountId,
+        audienceIgUserId: comment.from.id,
+        username: comment.from.username ?? null,
+        triggerType: 'comment',
+        automationId: automation.id as string,
+      });
     }
+    break;
   }
-
-  if (enqueued > 0) {
-    recordContactInteraction({
-      instagramAccountId,
-      audienceIgUserId: comment.from.id,
-      username: comment.from.username ?? null,
-      triggerType: 'comment',
-      automationId: capturedAutomationId,
-    });
-  }
-  return enqueued;
+  return result;
 }
 
 async function processDmEvent(
   instagramAccountId: string,
   igAccountIgsid: string,
-  messaging: MetaWebhookMessaging
-): Promise<number> {
+  messaging: MetaWebhookMessaging,
+  inboxId: string | null
+): Promise<ProcessEventResult> {
   // Filter echoes (our own sends), read receipts, delivery receipts
   if (messaging.message?.is_echo || messaging.read || messaging.delivery) {
     const kind = messaging.message?.is_echo ? 'echo' : messaging.read ? 'read_receipt' : 'delivery_receipt';
     debugLog('webhook', 'info', 'dm_event_filtered', 'skipped', `DM event filtered - ${kind}`, { kind });
-    return 0;
+    return emptyResult();
   }
   // Self-messaging loop guard
-  if (messaging.sender.id === messaging.recipient.id) return 0;
+  if (messaging.sender.id === messaging.recipient.id) return emptyResult();
 
   const message = messaging.message;
   const triggerTimestamp = messaging.timestamp;
@@ -229,7 +196,7 @@ async function processDmEvent(
 
   if (eventAgeMs > MAX_EVENT_AGE_MS) {
     debugLog('webhook', 'warn', 'window_check', 'skipped', `DM event ${Math.round(eventAgeMs / 3600000)}h old - beyond window`, {});
-    return 0;
+    return emptyResult();
   }
 
   const db = createServiceClient();
@@ -243,7 +210,7 @@ async function processDmEvent(
     if (sessionMatch) {
       const sessionId = sessionMatch[1] as string;
       const sessionStep = parseInt(sessionMatch[2] as string, 10);
-      const eventMid = message?.mid ?? `postback_${messaging.sender.id}_${triggerTimestamp}`;
+      const eventMid = message?.mid ?? messaging.postback?.mid ?? `postback_${messaging.sender.id}_${triggerTimestamp}`;
       const eventText = message?.text ?? messaging.postback?.title ?? null;
 
       debugLog('webhook', 'info', 'quick_reply_tap', 'processing', `Button tap - session ${sessionId} step ${sessionStep}`, {
@@ -262,14 +229,14 @@ async function processDmEvent(
         debugLog('webhook', 'error', 'session_lookup', 'error', `DB error fetching session: ${sessionError.message}`, {
           sessionId,
         });
-        // Fall through to keyword matching rather than dropping the event
+        throw new Error(`automation_sessions lookup failed: ${sessionError.message}`);
       } else if (!session) {
         debugLog('webhook', 'warn', 'session_lookup', 'skipped', `Session ${sessionId} not found - tap ignored`, { sessionId });
-        return 0;
+        return emptyResult();
       } else if (session.completed || new Date(session.expires_at as string) < new Date()) {
         debugLog('webhook', 'info', 'session_lookup', 'skipped',
           `Session ${sessionId} is ${session.completed ? 'completed' : 'expired'} - tap ignored`, { sessionId });
-        return 0;
+        return emptyResult();
       } else {
         const followUpPayload: AutoDmJobPayload = {
           automationId: session.automation_id as string,
@@ -286,12 +253,13 @@ async function processDmEvent(
           sessionId,
           sessionStep,
         };
-        const jobId = await enqueueJob('follow_up', followUpPayload, `followup_${sessionId}_${sessionStep}_${eventMid}`);
-        debugLog('webhook', 'info', 'job_enqueued', jobId ? 'ok' : 'skipped', `Follow-up job ${jobId ? `enqueued (${jobId})` : 'duplicate - ignored'}`, {
-          sessionId,
-          sessionStep,
-        });
-        if (jobId) {
+        const job = await enqueueJob('follow_up', followUpPayload, `followup_${sessionId}_${sessionStep}_${eventMid}`, inboxId);
+        debugLog('webhook', 'info', 'job_enqueued', job.status === 'created' ? 'ok' : 'skipped',
+          `Follow-up job ${job.status === 'created' ? `enqueued (${job.id})` : 'duplicate - ignored'}`, {
+            sessionId,
+            sessionStep,
+          });
+        if (job.status === 'created') {
           recordContactInteraction({
             instagramAccountId,
             audienceIgUserId: messaging.sender.id,
@@ -299,7 +267,9 @@ async function processDmEvent(
             automationId: session.automation_id as string,
           });
         }
-        return jobId ? 1 : 0;
+        const result = emptyResult();
+        addJob(result, job);
+        return result;
       }
     }
   }
@@ -310,7 +280,7 @@ async function processDmEvent(
   // dm_reply automations - one event never fires both types.
   if (!message?.text) {
     debugLog('webhook', 'info', 'dm_event', 'skipped', 'DM has no text - skipping keyword match', {});
-    return 0;
+    return emptyResult();
   }
 
   const isStoryReply = !!message.reply_to?.story;
@@ -333,14 +303,14 @@ async function processDmEvent(
 
   if (error) {
     debugLog('webhook', 'error', 'automations_fetch', 'error', `DB error fetching ${automationType} automations: ${error.message}`, {});
-    return 0;
+    throw new Error(`${automationType} automations fetch failed: ${error.message}`);
   }
   if (!automations?.length) {
     debugLog('webhook', 'info', 'automations_fetch', 'skipped', `No active ${automationType} automations`, {});
-    return 0;
+    return emptyResult();
   }
 
-  let enqueued = 0;
+  const result = emptyResult();
   let capturedAutomationId: string | null = null;
   for (const automation of automations) {
     if (!keywordMatches(message.text, automation.keywords as string[] | null)) {
@@ -367,14 +337,14 @@ async function processDmEvent(
       commentText: null,
       messageText: message.text,
     };
-    const jobId = await enqueueJob('auto_dm', payload, `event_${automation.id}_${message.mid}`);
-    if (jobId) {
-      enqueued += 1;
+    const job = await enqueueJob('auto_dm', payload, `event_${automation.id}_${message.mid}`, inboxId);
+    addJob(result, job);
+    if (job.status === 'created') {
       capturedAutomationId = capturedAutomationId ?? (automation.id as string);
     }
   }
 
-  if (enqueued > 0) {
+  if (result.created.length > 0) {
     recordContactInteraction({
       instagramAccountId,
       audienceIgUserId: messaging.sender.id,
@@ -383,8 +353,8 @@ async function processDmEvent(
     });
   }
 
-  if (enqueued === 0 && automations.length > 0) {
+  if (result.created.length + result.existing.length === 0) {
     logger.debug({ senderId: messaging.sender.id, automationType }, 'Message matched no automations');
   }
-  return enqueued;
+  return result;
 }
