@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<Response> {
       due.map((d) =>
         d.table === 'webhook_inbox'
           ? webhookReceivedEvent(d.id, d.instagramAccountId, d.generation)
-          : jobReadyEvent(d.id, d.instagramAccountId, d.generation)
+          : jobReadyEvent(d.id, d.instagramAccountId, d.generation, d.jobType)
       )
     );
   });

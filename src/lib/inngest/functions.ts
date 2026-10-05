@@ -2,6 +2,7 @@
  * Inngest functions - the only code paths that execute Instagram sends.
  *
  * processWebhookEvent: stored inbox row → jobs (idempotent) → job.ready events.
+ *                      Button taps usually skip this; the receiver fast-tracks them.
  * runJob:              one job → claim, prepare, per-action sends, finalize.
  */
 
@@ -28,7 +29,7 @@ export const processWebhookEvent = inngest.createFunction(
     const jobs = await step.run('process-event', () => processStoredInboxEvent(event.data.inboxId));
     const refs = await step.run('find-unpublished-jobs', () => unpublishedJobs([...jobs.created, ...jobs.existing]));
     if (refs.length > 0) {
-      await step.sendEvent('publish-jobs', refs.map((r) => jobReadyEvent(r.jobId, r.instagramAccountId, r.generation)));
+      await step.sendEvent('publish-jobs', refs.map((r) => jobReadyEvent(r.jobId, r.instagramAccountId, r.generation, r.jobType)));
       await step.run('mark-jobs-published', async () => {
         await Promise.all(refs.map((r) => markPublished('job_queue', r.jobId, r.generation)));
       });
@@ -41,8 +42,9 @@ export const runJob = inngest.createFunction(
   {
     id: 'run-job',
     triggers: [jobReady],
-    // One active step per account; the job lease and action guards cover what this cannot.
-    concurrency: { limit: 1, key: 'event.data.instagramAccountId' },
+    // One active run per account and job type, so button follow-ups never queue behind initial DMs.
+    // The job lease and action guards cover what this cannot.
+    concurrency: { limit: 1, key: 'event.data.instagramAccountId + "-" + event.data.jobType' },
     retries: 3,
     onFailure: async ({ event, error }) => {
       await recordJobFailure(event.data.event.data.jobId, errorMessage(error));

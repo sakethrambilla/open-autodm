@@ -30,6 +30,9 @@ const logger = createLogger('webhook');
 /** Max event age accepted for processing: 24h window + 1h queue buffer. */
 const MAX_EVENT_AGE_MS = 25 * 60 * 60 * 1000;
 
+/** Button tap payload: SESSION_{uuid}_STEP_{n}. */
+export const SESSION_TAP_PAYLOAD = /^SESSION_([0-9a-f-]+)_STEP_(\d+)$/i;
+
 export interface ProcessEventResult {
   created: string[];
   existing: string[];
@@ -206,7 +209,7 @@ async function processDmEvent(
   // visible label could collide across automations.
   const tapPayload = messaging.message?.quick_reply?.payload ?? messaging.postback?.payload;
   if (tapPayload) {
-    const sessionMatch = /^SESSION_([0-9a-f-]+)_STEP_(\d+)$/i.exec(tapPayload);
+    const sessionMatch = SESSION_TAP_PAYLOAD.exec(tapPayload);
     if (sessionMatch) {
       const sessionId = sessionMatch[1] as string;
       const sessionStep = parseInt(sessionMatch[2] as string, 10);

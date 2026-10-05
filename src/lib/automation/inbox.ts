@@ -4,12 +4,14 @@
  * The receiver splits a verified Meta envelope into supported events and
  * stores each one in webhook_inbox under a stable per-account key before
  * acknowledging. Duplicate deliveries hit the unique key and are no-ops.
- * Processing happens later from the stored row, never in the receiver.
+ * Processing happens later from the stored row; button taps are the one
+ * exception, matched inline by fastTrackButtonTaps to skip an Inngest hop.
  */
 
 import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/service';
-import { processInboxEvent, type ProcessEventResult } from '@/lib/automation/processWebhook';
+import { processInboxEvent, SESSION_TAP_PAYLOAD, type ProcessEventResult } from '@/lib/automation/processWebhook';
+import { markPublished, unpublishedJobs, type JobPublicationRef } from '@/lib/automation/queue';
 import type { MetaWebhookMessaging, NormalizedWebhookEvent, WebhookInboxRow } from '@/lib/types';
 
 export const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
@@ -113,8 +115,14 @@ function extractMessaging(igAccountIgsid: string, messaging: MetaWebhookMessagin
   return null;
 }
 
+function isButtonTap(event: NormalizedWebhookEvent): boolean {
+  if (event.kind === 'comment') return false;
+  const payload = event.messaging.message?.quick_reply?.payload ?? event.messaging.postback?.payload;
+  return !!payload && SESSION_TAP_PAYLOAD.test(payload);
+}
+
 export interface InboxReceipt {
-  stored: Array<{ id: string; instagramAccountId: string }>;
+  stored: Array<{ id: string; instagramAccountId: string; buttonTap: boolean }>;
   duplicates: number;
   unknownAccount: number;
 }
@@ -123,7 +131,7 @@ export interface InboxReceipt {
  * Persists events for connected, active accounts. Throws on any database
  * error so the caller can return 5xx and let Meta redeliver.
  */
-export async function storeInboxEvents(events: ExtractedEvent[]): Promise<InboxReceipt> {
+export async function storeInboxEvents(events: ExtractedEvent[], requestReceivedAt = new Date()): Promise<InboxReceipt> {
   const receipt: InboxReceipt = { stored: [], duplicates: 0, unknownAccount: 0 };
   if (events.length === 0) return receipt;
 
@@ -155,6 +163,7 @@ export async function storeInboxEvents(events: ExtractedEvent[]): Promise<InboxR
         event_kind: e.event.kind,
         payload: e.event,
         occurred_at: e.occurredAtMs === null ? null : new Date(e.occurredAtMs).toISOString(),
+        request_received_at: requestReceivedAt.toISOString(),
       });
     }
   }
@@ -163,11 +172,12 @@ export async function storeInboxEvents(events: ExtractedEvent[]): Promise<InboxR
   const { data: inserted, error: insertError } = await db
     .from('webhook_inbox')
     .upsert(rows, { onConflict: 'instagram_account_id,event_key', ignoreDuplicates: true })
-    .select('id, instagram_account_id');
+    .select('id, instagram_account_id, event_key');
   if (insertError) throw new Error(`webhook_inbox insert failed: ${insertError.message}`);
 
-  for (const r of (inserted ?? []) as Array<{ id: string; instagram_account_id: string }>) {
-    receipt.stored.push({ id: r.id, instagramAccountId: r.instagram_account_id });
+  const tapKeys = new Set(events.filter((e) => isButtonTap(e.event)).map((e) => e.eventKey));
+  for (const r of (inserted ?? []) as Array<{ id: string; instagram_account_id: string; event_key: string }>) {
+    receipt.stored.push({ id: r.id, instagramAccountId: r.instagram_account_id, buttonTap: tapKeys.has(r.event_key) });
   }
   receipt.duplicates = rows.length - receipt.stored.length;
   return receipt;
@@ -208,6 +218,48 @@ export async function publishInboxEvents(refs: InboxPublicationRef[], timeoutMs 
   }
 }
 
+export type JobPublisher = (refs: JobPublicationRef[]) => Promise<void>;
+
+let jobPublisher: JobPublisher | null = null;
+
+/** Registers the job.ready publisher (Inngest) used by the button-tap fast path. */
+export function setJobPublisher(publisher: JobPublisher | null): void {
+  jobPublisher = publisher;
+}
+
+/**
+ * Button-tap fast path: runs session routing in the receiver and publishes
+ * job.ready directly, skipping the processWebhookEvent hop. Never throws;
+ * returns the refs it could not finish so the caller publishes them normally.
+ * A timed-out attempt may still finish later - replay is idempotent.
+ */
+export async function fastTrackButtonTaps(refs: InboxPublicationRef[], timeoutMs = 3000): Promise<InboxPublicationRef[]> {
+  if (refs.length === 0 || !jobPublisher) return refs;
+  const publisher = jobPublisher;
+  const outcomes = await Promise.all(
+    refs.map(async (ref) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          (async () => {
+            const jobs = await processStoredInboxEvent(ref.inboxId, true);
+            const jobRefs = await unpublishedJobs([...jobs.created, ...jobs.existing]);
+            if (jobRefs.length > 0) await publisher(jobRefs);
+            await markPublished('webhook_inbox', ref.inboxId, 0);
+          })(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('fast path timed out')), timeoutMs);
+          }),
+        ]).finally(() => clearTimeout(timer));
+        return null;
+      } catch {
+        return ref;
+      }
+    })
+  );
+  return outcomes.filter((r): r is InboxPublicationRef => r !== null);
+}
+
 export async function loadInboxEvent(inboxId: string): Promise<WebhookInboxRow | null> {
   const db = createServiceClient();
   const { data, error } = await db.from('webhook_inbox').select('*').eq('id', inboxId).maybeSingle();
@@ -219,12 +271,12 @@ export async function loadInboxEvent(inboxId: string): Promise<WebhookInboxRow |
  * Runs matching/session logic for one stored event and marks it processed.
  * Safe to replay: job creation is idempotent and reports existing job IDs.
  */
-export async function processStoredInboxEvent(inboxId: string): Promise<ProcessEventResult> {
+export async function processStoredInboxEvent(inboxId: string, fastPath = false): Promise<ProcessEventResult> {
   const row = await loadInboxEvent(inboxId);
   if (!row) return { created: [], existing: [] };
   const result = await processInboxEvent(row.instagram_account_id, row.payload, row.id);
   const db = createServiceClient();
-  const { error } = await db.from('webhook_inbox').update({ state: 'processed', last_error: null }).eq('id', inboxId);
+  const { error } = await db.from('webhook_inbox').update({ state: 'processed', last_error: null, ...(fastPath ? { fast_path: true } : {}) }).eq('id', inboxId);
   if (error) throw new Error(`webhook_inbox update failed: ${error.message}`);
   return result;
 }

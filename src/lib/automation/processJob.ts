@@ -65,9 +65,9 @@ function jitterMs(): number {
   return 2000 + Math.floor(Math.random() * 3000);
 }
 
-/** Shorter humanized pause BETWEEN consecutive messages in one flow. */
-function interMessageMs(): number {
-  return 1200 + Math.floor(Math.random() * 1300);
+/** Shorter humanized pause BETWEEN consecutive messages in one flow; follow-ups answer a tap, so keep them snappy. */
+function interMessageMs(jobType: JobQueueRow['job_type']): number {
+  return jobType === 'follow_up' ? 300 + Math.floor(Math.random() * 300) : 1200 + Math.floor(Math.random() * 1300);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -88,7 +88,7 @@ export async function executeJob(step: WorkflowStep, jobId: string, owner: strin
 
   let halted: DispatchResult | null = null;
   for (const [index, action] of plan.actions.entries()) {
-    if (index > 0) await step.sleep(`gap:${action.key}`, interMessageMs());
+    if (index > 0) await step.sleep(`gap:${action.key}`, interMessageMs(job.job_type));
     const result = await dispatchWithWaits(step, jobId, owner, action);
     if (result.state === 'lost') return { status: 'lost' };
     if (result.halt) {
