@@ -38,10 +38,10 @@ export default function DashboardPage() {
     const allDone = checklist.every(c => c.done);
 
     const stats = [
-        { label: "Active automations", value: String(activeCount), icon: Bot },
-        { label: "Comments · 30d", value: (analytics?.totals.comments ?? 0).toLocaleString(), icon: MessageCircle },
-        { label: "DMs delivered", value: totalDms.toLocaleString(), icon: Send },
-        { label: "Contacts captured", value: String(contacts?.length ?? 0), icon: Instagram },
+        { label: "Active automations", value: String(activeCount), icon: Bot, tile: "bg-lilac text-lilac-ink" },
+        { label: "Comments, last 30 days", value: (analytics?.totals.comments ?? 0).toLocaleString(), icon: MessageCircle, tile: "bg-peach text-peach-ink" },
+        { label: "DMs delivered", value: totalDms.toLocaleString(), icon: Send, tile: "bg-mist text-mist-ink" },
+        { label: "Contacts captured", value: String(contacts?.length ?? 0), icon: Instagram, tile: "bg-sage text-sage-ink" },
     ];
 
     return (
@@ -50,8 +50,8 @@ export default function DashboardPage() {
             {/* Header */}
             <div className="flex items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-xl font-heading font-semibold tracking-tight text-foreground">
-                        {connectedAccount ? <>Welcome back, <span className="text-transparent bg-clip-text ig-thread">@{connectedAccount.username}</span></> : "Welcome"}
+                    <h1 className="text-[26px] leading-tight font-heading font-extrabold tracking-[-0.025em] text-foreground">
+                        {connectedAccount ? `Welcome back, @${connectedAccount.username}` : "Welcome"}
                     </h1>
                     <p className="text-[13px] text-muted-foreground mt-1">
                         Your self-hosted Instagram automation console.
@@ -69,12 +69,12 @@ export default function DashboardPage() {
             {/* Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {stats.map((stat) => (
-                    <div key={stat.label} className="bg-card border border-border rounded-xl p-4">
-                        <div className="flex items-center justify-between">
-                            <span className="micro-label">{stat.label}</span>
-                            <stat.icon className="w-3.5 h-3.5 text-muted-foreground/60" />
+                    <div key={stat.label} className={cn("border border-foreground/70 rounded-md p-4", stat.tile)}>
+                        <div className="flex items-start justify-between gap-2">
+                            <span className="text-[12.5px] font-medium text-foreground/80">{stat.label}</span>
+                            <stat.icon className="w-4 h-4 shrink-0" />
                         </div>
-                        <p className="text-2xl font-heading font-semibold tracking-tight text-foreground mt-2 tabular-nums">{stat.value}</p>
+                        <p className="text-[32px] leading-none font-heading font-extrabold tracking-[-0.03em] text-foreground mt-5 tabular-nums">{stat.value}</p>
                     </div>
                 ))}
             </div>
@@ -82,8 +82,8 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
 
                 {/* Getting started */}
-                <div className="lg:col-span-3 bg-card border border-border rounded-xl p-5">
-                    <h2 className="text-[14px] font-heading font-semibold text-foreground">Getting started</h2>
+                <div className="lg:col-span-3 bg-card border border-border rounded-lg p-5">
+                    <h2 className="text-[14px] font-heading font-bold text-foreground">Getting started</h2>
                     <p className="text-[13px] text-muted-foreground mt-0.5 mb-4">
                         {allDone
                             ? "Everything is configured - your automations are live."
@@ -119,8 +119,8 @@ export default function DashboardPage() {
                 </div>
 
                 {/* System status */}
-                <div className="lg:col-span-2 bg-card border border-border rounded-xl p-5">
-                    <h2 className="text-[14px] font-heading font-semibold text-foreground mb-4">System</h2>
+                <div className="lg:col-span-2 bg-card border border-border rounded-lg p-5">
+                    <h2 className="text-[14px] font-heading font-bold text-foreground mb-4">System</h2>
                     <div className="space-y-1.5">
                         {[
                             { label: "Meta app", ok: !!setup?.configured, detail: setup?.configured ? "Configured" : "Pending" },

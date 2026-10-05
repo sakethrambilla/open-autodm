@@ -149,7 +149,7 @@ function SettingsContent() {
     return (
         <div className="w-full max-w-3xl mx-auto space-y-5 pb-16">
             <div>
-                <h1 className="text-xl font-heading font-semibold tracking-tight text-foreground">Settings</h1>
+                <h1 className="text-[26px] leading-tight font-heading font-extrabold tracking-[-0.025em] text-foreground">Settings</h1>
                 <p className="text-[13px] text-muted-foreground mt-1">Connected accounts and this instance.</p>
             </div>
 
@@ -168,9 +168,9 @@ function SettingsContent() {
             )}
 
             {/* Meta app */}
-            <section className="bg-card border border-border rounded-xl p-5 flex items-center justify-between gap-4">
+            <section className="bg-card border border-border rounded-lg p-5 flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                    <h2 className="text-[14px] font-heading font-semibold text-foreground">Meta app</h2>
+                    <h2 className="text-[14px] font-heading font-bold text-foreground">Meta app</h2>
                     <p className="text-[13px] text-muted-foreground mt-0.5 truncate">
                         {setup?.configured
                             ? <>Configured - app <code className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded">{setup.metaAppId}</code></>
@@ -192,10 +192,10 @@ function SettingsContent() {
             </section>
 
             {/* Instagram accounts */}
-            <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <section className="bg-card border border-border rounded-lg p-5 space-y-4">
                 <div className="flex items-center justify-between gap-4">
                     <div>
-                        <h2 className="text-[14px] font-heading font-semibold text-foreground">Instagram accounts</h2>
+                        <h2 className="text-[14px] font-heading font-bold text-foreground">Instagram accounts</h2>
                         <p className="text-[13px] text-muted-foreground mt-0.5">
                             Business or Creator accounts only.
                         </p>
@@ -236,7 +236,7 @@ function SettingsContent() {
                                         "flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-[12px] font-medium",
                                         account.token_status === "expired"
                                             ? "bg-destructive/10 text-destructive"
-                                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                            : "bg-peach text-peach-ink"
                                     )}>
                                         <div className="flex items-center gap-2 min-w-0">
                                             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -269,7 +269,7 @@ function SettingsContent() {
 
                                 <div className="flex items-center justify-between p-3 rounded-lg border border-border">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <div className="relative w-9 h-9 rounded-full ig-ring p-[1.5px] shrink-0">
+                                        <div className="relative w-9 h-9 rounded-full quad-ring p-[1.5px] shrink-0">
                                             <div className="w-full h-full rounded-full bg-background overflow-hidden flex items-center justify-center">
                                                 {account.profile_picture_url ? (
                                                     <img src={account.profile_picture_url} alt={account.username} className="w-full h-full object-cover" />
@@ -283,7 +283,7 @@ function SettingsContent() {
                                                 <span className="text-[13px] font-semibold text-foreground truncate">@{account.username}</span>
                                                 {account.token_status === "ok" && !account.is_paused
                                                     ? <CheckCircle2 className="w-3.5 h-3.5 text-secondary shrink-0" />
-                                                    : <AlertTriangle className={cn("w-3.5 h-3.5 shrink-0", account.token_status === "expired" ? "text-destructive" : "text-amber-500")} />}
+                                                    : <AlertTriangle className={cn("w-3.5 h-3.5 shrink-0", account.token_status === "expired" ? "text-destructive" : "text-peach-ink")} />}
                                             </div>
                                             <span className="text-[11px] text-muted-foreground">
                                                 Connected {new Date(account.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -328,7 +328,7 @@ function SettingsContent() {
                                             ? "bg-destructive/10 text-destructive"
                                             : subStatus[account.id]?.hasComments
                                             ? "bg-secondary/10 text-secondary"
-                                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                            : "bg-peach text-peach-ink"
                                     )}>
                                         {subStatus[account.id] === null ? (
                                             <span>Couldn&apos;t fetch subscription status from Meta.</span>
@@ -362,8 +362,8 @@ function SettingsContent() {
             </section>
 
             {/* Account */}
-            <section className="bg-card border border-border rounded-xl p-5 flex items-center justify-between">
-                <h2 className="text-[14px] font-heading font-semibold text-foreground">Session</h2>
+            <section className="bg-card border border-border rounded-lg p-5 flex items-center justify-between">
+                <h2 className="text-[14px] font-heading font-bold text-foreground">Session</h2>
                 <button
                     onClick={handleSignOut}
                     className="h-8 px-3 rounded-lg text-[13px] font-medium text-muted-foreground border border-border hover:text-destructive hover:border-destructive/40 transition-colors"

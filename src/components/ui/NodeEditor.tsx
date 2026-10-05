@@ -19,13 +19,10 @@ function AnimatedConnection({
         <motion.path
             d={path}
             stroke={color}
-            strokeWidth="3"
-            strokeDasharray="8 8"
+            strokeWidth="1.5"
+            strokeDasharray="5 6"
             fill="none"
-            className="animate-[flowDots_1s_linear_infinite]"
-            style={{
-                filter: "drop-shadow(0px 0px 6px " + color + "a0)"
-            }}
+            className="animate-[flowDots_1.4s_linear_infinite]"
         />
     );
 }
@@ -75,16 +72,15 @@ export function NodeEditor() {
                     <style dangerouslySetInnerHTML={{
                         __html: `
             @keyframes flowDots {
-              from { stroke-dashoffset: 16; }
+              from { stroke-dashoffset: 11; }
               to { stroke-dashoffset: 0; }
             }
           `}} />
 
-                    {/* n8n style vivid connecting lines */}
-                    <AnimatedConnection startX={cx} startY={cy} endX={dmX} endY={dmY} color="#F97316" />
-                    <AnimatedConnection startX={cx} startY={cy} endX={contentX} endY={contentY} color="#F97316" />
-                    <AnimatedConnection startX={cx} startY={cy} endX={linksX} endY={linksY} color="#22C55E" />
-                    <AnimatedConnection startX={cx} startY={cy} endX={analyticsX} endY={analyticsY} color="#22C55E" />
+                    <AnimatedConnection startX={cx} startY={cy} endX={dmX} endY={dmY} color="var(--foreground)" />
+                    <AnimatedConnection startX={cx} startY={cy} endX={contentX} endY={contentY} color="var(--foreground)" />
+                    <AnimatedConnection startX={cx} startY={cy} endX={linksX} endY={linksY} color="var(--foreground)" />
+                    <AnimatedConnection startX={cx} startY={cy} endX={analyticsX} endY={analyticsY} color="var(--foreground)" />
                 </svg>
             </div>
 
@@ -93,15 +89,12 @@ export function NodeEditor() {
                 drag
                 dragMomentum={false}
                 dragElastic={0}
-                whileHover={{ scale: 1.05 }}
                 dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
                 style={{ x: cx, y: cy }}
-                className="absolute z-20 flex flex-col items-center justify-center pointer-events-auto shadow-2xl shadow-primary/40 p-4 px-6 rounded-3xl cursor-grab active:cursor-grabbing border border-primary/50 backdrop-blur-md bg-gradient-to-br from-[#F97316] to-[#ea580c]"
+                className="absolute z-20 flex items-center gap-2.5 pointer-events-auto px-4 py-3.5 rounded-md cursor-grab active:cursor-grabbing bg-foreground text-background"
             >
-                <div className="w-8 h-8 sm:w-10 sm:h-10 mb-1.5 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                    <Workflow className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                </div>
-                <span className="font-bold text-[11px] sm:text-[13px] tracking-tight text-white drop-shadow-sm">AutoDM Hub</span>
+                <Workflow className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-heading font-bold text-[13px] sm:text-[15px] tracking-tight">AutoDM hub</span>
             </motion.div>
 
             {/* Peripheral Nodes - Draggable */}
@@ -111,12 +104,10 @@ export function NodeEditor() {
                 dragElastic={0}
                 dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
                 style={{ x: dmX, y: dmY }}
-                className="absolute z-10 pointer-events-auto flex items-center space-x-2.5 p-2 px-3 sm:p-2.5 sm:px-4 bg-white dark:bg-[#111] border border-border dark:border-white/10 rounded-xl shadow-lg cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors"
+                className="absolute z-10 pointer-events-auto flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5 bg-lilac text-lilac-ink border border-foreground/80 rounded-md cursor-grab active:cursor-grabbing"
             >
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-primary/10 flex items-center justify-center">
-                    <Send className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
-                </div>
-                <span className="font-semibold text-[10px] sm:text-xs uppercase tracking-wider text-foreground dark:text-white/80">DM Auto</span>
+                <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="font-semibold text-[12px] sm:text-[13px] text-foreground">DM auto</span>
             </motion.div>
 
             <motion.div
@@ -125,12 +116,10 @@ export function NodeEditor() {
                 dragElastic={0}
                 dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
                 style={{ x: contentX, y: contentY }}
-                className="absolute z-10 pointer-events-auto flex items-center space-x-2.5 p-2 px-3 sm:p-2.5 sm:px-4 bg-white dark:bg-[#111] border border-border dark:border-white/10 rounded-xl shadow-lg cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors"
+                className="absolute z-10 pointer-events-auto flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5 bg-peach text-peach-ink border border-foreground/80 rounded-md cursor-grab active:cursor-grabbing"
             >
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-primary/10 flex items-center justify-center">
-                    <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
-                </div>
-                <span className="font-semibold text-[10px] sm:text-xs uppercase tracking-wider text-foreground dark:text-white/80">Content</span>
+                <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="font-semibold text-[12px] sm:text-[13px] text-foreground">Content</span>
             </motion.div>
 
             <motion.div
@@ -139,12 +128,10 @@ export function NodeEditor() {
                 dragElastic={0}
                 dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
                 style={{ x: linksX, y: linksY }}
-                className="absolute z-10 pointer-events-auto flex items-center space-x-2.5 p-2 px-3 sm:p-2.5 sm:px-4 bg-white dark:bg-[#111] border border-border dark:border-white/10 rounded-xl shadow-lg cursor-grab active:cursor-grabbing hover:border-secondary/50 transition-colors"
+                className="absolute z-10 pointer-events-auto flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5 bg-sage text-sage-ink border border-foreground/80 rounded-md cursor-grab active:cursor-grabbing"
             >
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-secondary/10 flex items-center justify-center">
-                    <Layers className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-secondary" />
-                </div>
-                <span className="font-semibold text-[10px] sm:text-xs uppercase tracking-wider text-foreground dark:text-white/80">Links</span>
+                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="font-semibold text-[12px] sm:text-[13px] text-foreground">Links</span>
             </motion.div>
 
             <motion.div
@@ -153,17 +140,15 @@ export function NodeEditor() {
                 dragElastic={0}
                 dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
                 style={{ x: analyticsX, y: analyticsY }}
-                className="absolute z-10 pointer-events-auto flex items-center space-x-2.5 p-2 px-3 sm:p-2.5 sm:px-4 bg-white dark:bg-[#111] border border-border dark:border-white/10 rounded-xl shadow-lg cursor-grab active:cursor-grabbing hover:border-secondary/50 transition-colors"
+                className="absolute z-10 pointer-events-auto flex items-center gap-2 px-3 py-2 sm:px-3.5 sm:py-2.5 bg-mist text-mist-ink border border-foreground/80 rounded-md cursor-grab active:cursor-grabbing"
             >
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md bg-secondary/10 flex items-center justify-center">
-                    <BarChart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-secondary" />
-                </div>
-                <span className="font-semibold text-[10px] sm:text-xs uppercase tracking-wider text-foreground dark:text-white/80">Analytics</span>
+                <BarChart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="font-semibold text-[12px] sm:text-[13px] text-foreground">Analytics</span>
             </motion.div>
 
             {/* Hint Text */}
-            <div className="absolute bottom-2 right-4 text-[9px] uppercase tracking-widest text-muted-foreground/60 font-mono pointer-events-none">
-                Drag Any Node
+            <div className="absolute bottom-2 right-4 text-[12px] text-muted-foreground pointer-events-none">
+                Drag any node
             </div>
         </div>
     );

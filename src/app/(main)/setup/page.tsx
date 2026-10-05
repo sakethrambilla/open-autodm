@@ -71,7 +71,7 @@ function StepCard({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: step * 0.05 }}
-            className="bg-card border border-border rounded-xl overflow-hidden"
+            className="bg-card border border-border rounded-lg overflow-hidden"
         >
             <div className="flex items-center gap-3 px-5 h-12 border-b border-border">
                 <div className={cn(
@@ -81,7 +81,7 @@ function StepCard({
                     {done ? <CheckCircle2 className="w-4 h-4 text-secondary" /> : <Icon className="w-4 h-4 text-muted-foreground" />}
                 </div>
                 <span className="micro-label">Step {step}</span>
-                <h2 className="text-[13.5px] font-heading font-semibold text-foreground">{title}</h2>
+                <h2 className="text-[13.5px] font-heading font-bold text-foreground">{title}</h2>
             </div>
             <div className="p-5">{children}</div>
         </motion.section>
@@ -129,7 +129,7 @@ export default function SetupPage() {
         <div className="w-full max-w-2xl mx-auto space-y-4 pb-16">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-xl font-heading font-semibold tracking-tight text-foreground flex items-center gap-2">
+                    <h1 className="text-[26px] leading-tight font-heading font-extrabold tracking-[-0.025em] text-foreground flex items-center gap-2">
                         <Wrench className="w-4.5 h-4.5 w-[18px] h-[18px] text-muted-foreground" />
                         Setup Wizard
                     </h1>
@@ -155,7 +155,7 @@ export default function SetupPage() {
                     <>Your Instagram must be a <b>Business or Creator</b> account (switch in the app: Settings → Account type).</>,
                 ]} />
                 <div className="mt-4 flex items-start gap-2 text-[12px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2.5">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-peach-ink" />
                     <span>
                         Your app starts in <b>Development mode</b> - perfect for building and testing. In dev mode, automations
                         work for accounts that hold a <b>role on your app</b> (you + testers - see Step 5). To let the
@@ -296,7 +296,7 @@ export default function SetupPage() {
                         ]} />
                     </div>
                     <div className="flex items-start gap-2 text-[12px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2.5">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-peach-ink" />
                         <span>
                             <b>Going public:</b> to fire on comments from anyone, request <b>Advanced Access</b> via Meta&apos;s free
                             App Review - upload a short screencast of your working flow. Typically approved in days; nothing in
@@ -310,7 +310,7 @@ export default function SetupPage() {
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl border border-secondary/25 bg-secondary/5 p-4 flex items-start gap-3"
+                    className="rounded-lg border border-secondary/25 bg-secondary/5 p-4 flex items-start gap-3"
                 >
                     <CheckCircle2 className="w-4.5 h-4.5 w-[18px] h-[18px] text-secondary shrink-0 mt-0.5" />
                     <div>

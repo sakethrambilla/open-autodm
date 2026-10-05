@@ -20,7 +20,7 @@ export function SelectTypeStep({ onSelect, selectedType }: SelectTypeStepProps) 
         <div className="flex flex-col items-center justify-center w-full h-full p-6 overflow-y-auto">
             <div className="max-w-2xl w-full mx-auto space-y-8 pb-8">
                 <div className="text-center space-y-1.5 pt-6">
-                    <h2 className="text-xl font-heading font-semibold tracking-tight text-foreground">
+                    <h2 className="text-[26px] leading-tight font-heading font-extrabold tracking-[-0.025em] text-foreground">
                         What starts this automation?
                     </h2>
                     <p className="text-[13px] text-muted-foreground max-w-md mx-auto">
@@ -42,7 +42,7 @@ export function SelectTypeStep({ onSelect, selectedType }: SelectTypeStepProps) 
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.05 }}
                                 className={cn(
-                                    "relative group text-left p-4 rounded-xl border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                                    "relative group text-left p-4 rounded-lg border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                                     !type.available
                                         ? "opacity-50 cursor-not-allowed border-border"
                                         : "cursor-pointer bg-card border-border hover:border-foreground/25",
@@ -62,7 +62,7 @@ export function SelectTypeStep({ onSelect, selectedType }: SelectTypeStepProps) 
                                                 {type.name}
                                             </h3>
                                             {!type.available && (
-                                                <span className="text-[9px] font-semibold uppercase tracking-widest bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+                                                <span className="text-[11px] font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
                                                     Soon
                                                 </span>
                                             )}

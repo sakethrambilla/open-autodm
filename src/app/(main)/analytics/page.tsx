@@ -20,10 +20,10 @@ import { cn } from "@/lib/utils";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useActiveAccount } from "@/hooks/useActiveAccount";
 
-/* Validated categorical palette - fixed slot order, per-mode steps */
+/* Deep tones of the four quadrant pastels plus a rose fifth - fixed slot order, per-mode steps */
 const PALETTE = {
-    light: { comments: "#eb6834", dms: "#2a78d6", stories: "#1baf7a", delivered: "#4a3aa7", contacts: "#e87ba4" },
-    dark: { comments: "#d95926", dms: "#3987e5", stories: "#199e70", delivered: "#9085e9", contacts: "#d55181" },
+    light: { comments: "#C0702E", dms: "#5B45A3", stories: "#3D7339", delivered: "#2C7E7A", contacts: "#B0577A" },
+    dark: { comments: "#EBBB8A", dms: "#BCA9F0", stories: "#9BCB8C", delivered: "#8FD0CB", contacts: "#E39BB5" },
 };
 
 const RANGES = [
@@ -84,9 +84,9 @@ export default function AnalyticsPage() {
 
     const { data, isLoading } = useAnalytics({ from, to, automationId, accountId });
 
-    const gridStroke = resolvedTheme === "light" ? "#EDEDEF" : "#232329";
-    const axisTick = { fontSize: 10.5, fill: "#898781" } as const;
-    const surface = resolvedTheme === "light" ? "#FFFFFF" : "#101013";
+    const gridStroke = resolvedTheme === "light" ? "#E4E1DA" : "#35343B";
+    const axisTick = { fontSize: 10.5, fill: "#8A8790" } as const;
+    const surface = resolvedTheme === "light" ? "#FCFBF8" : "#201F24";
 
     const totals = data?.totals;
     const funnel = totals
@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
             {/* Filter row */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-xl font-heading font-semibold tracking-tight text-foreground">Analytics</h1>
+                    <h1 className="text-[26px] leading-tight font-heading font-extrabold tracking-[-0.025em] text-foreground">Analytics</h1>
                     <p className="text-[13px] text-muted-foreground mt-0.5">
                         {account ? <>What <span className="font-medium text-foreground">@{account.username}</span>&apos;s automations actually did.</> : "What your automations actually did."}
                     </p>
@@ -156,7 +156,7 @@ export default function AnalyticsPage() {
             ) : (
                 <>
                     {data.truncated && (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 text-[12px] font-medium text-amber-600 dark:text-amber-400">
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-peach text-[12px] font-medium text-peach-ink">
                             <AlertTriangle className="w-3.5 h-3.5" />
                             Very large range - numbers are computed from the first 20,000 events.
                         </div>
@@ -165,12 +165,12 @@ export default function AnalyticsPage() {
                     {/* Stat tiles */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         {tiles.map((t) => (
-                            <div key={t.label} className="bg-card border border-border rounded-xl p-4">
+                            <div key={t.label} className="bg-card border border-border rounded-lg p-4">
                                 <div className="flex items-center justify-between">
                                     <span className="micro-label">{t.label}</span>
                                     <t.icon className="w-3.5 h-3.5 text-muted-foreground/60" />
                                 </div>
-                                <p className="text-2xl font-heading font-semibold tracking-tight text-foreground mt-2 tabular-nums">
+                                <p className="text-2xl font-heading font-bold tracking-tight text-foreground mt-2 tabular-nums">
                                     {t.value.toLocaleString()}
                                 </p>
                                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{t.sub}</p>
@@ -179,8 +179,8 @@ export default function AnalyticsPage() {
                     </div>
 
                     {/* Funnel */}
-                    <div className="bg-card border border-border rounded-xl p-5">
-                        <h2 className="text-[13.5px] font-heading font-semibold text-foreground mb-1">Conversion funnel</h2>
+                    <div className="bg-card border border-border rounded-lg p-5">
+                        <h2 className="text-[13.5px] font-heading font-bold text-foreground mb-1">Conversion funnel</h2>
                         <p className="text-[11.5px] text-muted-foreground mb-4">From trigger to gained follower, in this range.</p>
                         <div className="space-y-2">
                             {funnel.map((f, i) => {
@@ -207,10 +207,10 @@ export default function AnalyticsPage() {
                     </div>
 
                     {/* Daily triggers - stacked bars */}
-                    <div className="bg-card border border-border rounded-xl p-5">
+                    <div className="bg-card border border-border rounded-lg p-5">
                         <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                             <div>
-                                <h2 className="text-[13.5px] font-heading font-semibold text-foreground">Triggers per day</h2>
+                                <h2 className="text-[13.5px] font-heading font-bold text-foreground">Triggers per day</h2>
                                 <p className="text-[11.5px] text-muted-foreground mt-0.5">Comments, DM keywords, and story replies that matched an automation.</p>
                             </div>
                             <LegendRow items={[
@@ -235,10 +235,10 @@ export default function AnalyticsPage() {
                     </div>
 
                     {/* Deliveries + contacts - lines */}
-                    <div className="bg-card border border-border rounded-xl p-5">
+                    <div className="bg-card border border-border rounded-lg p-5">
                         <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                             <div>
-                                <h2 className="text-[13.5px] font-heading font-semibold text-foreground">Deliveries &amp; new contacts per day</h2>
+                                <h2 className="text-[13.5px] font-heading font-bold text-foreground">Deliveries &amp; new contacts per day</h2>
                                 <p className="text-[11.5px] text-muted-foreground mt-0.5">DMs that reached inboxes, and audience members captured for the first time.</p>
                             </div>
                             <LegendRow items={[
@@ -261,9 +261,9 @@ export default function AnalyticsPage() {
                     </div>
 
                     {/* Per-automation table */}
-                    <div className="bg-card border border-border rounded-xl overflow-hidden">
+                    <div className="bg-card border border-border rounded-lg overflow-hidden">
                         <div className="px-5 py-3.5 border-b border-border">
-                            <h2 className="text-[13.5px] font-heading font-semibold text-foreground">By automation</h2>
+                            <h2 className="text-[13.5px] font-heading font-bold text-foreground">By automation</h2>
                         </div>
                         {data.perAutomation.length === 0 ? (
                             <div className="p-10 text-center">
@@ -273,7 +273,7 @@ export default function AnalyticsPage() {
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left whitespace-nowrap">
-                                    <thead className="text-muted-foreground uppercase tracking-widest text-[10px] font-bold border-b border-border">
+                                    <thead className="text-muted-foreground text-[12px] font-medium border-b border-border">
                                         <tr>
                                             <th className="px-5 py-2.5">Automation</th>
                                             <th className="px-5 py-2.5">Type</th>

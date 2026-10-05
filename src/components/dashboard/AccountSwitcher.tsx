@@ -18,7 +18,7 @@ import type { InstagramAccount } from "@/hooks/useInstagramAccounts";
 function AccountAvatar({ account, size = 7 }: { account: InstagramAccount | null; size?: 6 | 7 }) {
     const cls = size === 6 ? "w-6 h-6" : "w-7 h-7";
     return (
-        <div className={cn(cls, "relative rounded-full ig-ring p-[1.5px] shrink-0")}>
+        <div className={cn(cls, "relative rounded-full quad-ring p-[1.5px] shrink-0")}>
             <div className="w-full h-full rounded-full bg-background flex items-center justify-center overflow-hidden">
                 {account?.profile_picture_url ? (
                     <img src={account.profile_picture_url} alt={account.username} className="w-full h-full object-cover rounded-full" />
@@ -112,7 +112,7 @@ export function AccountSwitcher({ isCollapsed }: { isCollapsed: boolean }) {
                         transition={{ duration: 0.12 }}
                         role="listbox"
                         className={cn(
-                            "absolute bottom-full mb-2 w-56 bg-popover border border-border rounded-xl shadow-xl overflow-hidden z-[100]",
+                            "absolute bottom-full mb-2 w-56 bg-popover border border-border rounded-lg shadow-xl overflow-hidden z-[100]",
                             isCollapsed ? "left-0" : "left-0 right-0 w-auto min-w-[210px]"
                         )}
                     >

@@ -290,10 +290,10 @@ export function NewAutomationModal({ isOpen, onClose, editAutomation, accountId 
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98, y: 12 }}
                         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                        className="relative w-full h-full max-w-[96vw] lg:max-w-6xl max-h-[92vh] bg-background border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden z-10"
+                        className="relative w-full h-full max-w-[96vw] lg:max-w-6xl max-h-[92vh] bg-background border border-border rounded-lg shadow-2xl flex flex-col overflow-hidden z-10"
                     >
                         {/* The warm thread - top edge */}
-                        <div className="h-[2px] w-full ig-thread shrink-0" />
+                        <div className="h-1.5 w-full quad-thread shrink-0" />
 
                         {/* Header */}
                         <div className="h-12 shrink-0 border-b border-border flex items-center justify-between px-4 gap-3">
@@ -391,11 +391,11 @@ export function NewAutomationModal({ isOpen, onClose, editAutomation, accountId 
                                         initial={{ scale: 0.97, y: 6 }}
                                         animate={{ scale: 1, y: 0 }}
                                         exit={{ scale: 0.97, y: 6 }}
-                                        className="bg-card border border-border rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl"
+                                        className="bg-card border border-border rounded-lg p-5 max-w-sm w-full mx-4 shadow-xl"
                                     >
                                         <div className="flex items-center gap-3 mb-4">
-                                            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                                                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                                            <div className="w-8 h-8 rounded-lg bg-peach flex items-center justify-center shrink-0">
+                                                <AlertTriangle className="w-4 h-4 text-peach-ink" />
                                             </div>
                                             <div>
                                                 <p className="text-[13.5px] font-semibold text-foreground">Unsaved changes</p>

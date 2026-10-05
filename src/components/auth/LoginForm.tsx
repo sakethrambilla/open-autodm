@@ -42,15 +42,14 @@ export function LoginForm() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.15 }}
-            className="w-full max-w-sm bg-card border border-border rounded-xl shadow-xl shadow-black/5 dark:shadow-black/40 overflow-hidden"
+            className="w-full max-w-sm bg-card border border-foreground/70 rounded-lg overflow-hidden"
         >
-            {/* The warm thread */}
-            <div className="h-[2px] w-full ig-thread" />
+            <div className="h-2 w-full quad-thread border-b border-foreground/70" />
 
             <div className="p-8">
                 <div className="flex flex-col mb-7">
                     <LogoMark className="w-9 h-9 mb-5" />
-                    <h1 className="text-lg font-heading font-semibold tracking-tight text-foreground mb-1">
+                    <h1 className="text-lg font-heading font-bold tracking-tight text-foreground mb-1">
                         Welcome back
                     </h1>
                     <p className="text-[13px] text-muted-foreground">

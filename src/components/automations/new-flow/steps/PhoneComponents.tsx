@@ -24,7 +24,7 @@ function CreatorAvatar({ url, size = "sm" }: { url?: string | null; size?: "sm" 
         return <img src={url} alt="you" className={cn(cls, "rounded-full object-cover shrink-0")} />;
     }
     return (
-        <div className={cn(cls, "rounded-full ig-ring shrink-0 flex items-center justify-center")}>
+        <div className={cn(cls, "rounded-full bg-[linear-gradient(45deg,#f09433,#e6683c,#dc2743,#bc1888)] shrink-0 flex items-center justify-center")}>
             <Zap className="w-2.5 h-2.5 text-white" />
         </div>
     );
@@ -101,7 +101,7 @@ export function StoryPhone({ keyword }: { keyword: string }) {
     return (
         <PhoneShell label="Your story">
             <div className="flex items-center gap-2.5 px-3 py-2.5">
-                <div className="w-7 h-7 rounded-full ig-ring p-[1.5px]">
+                <div className="w-7 h-7 rounded-full bg-[linear-gradient(45deg,#f09433,#e6683c,#dc2743,#bc1888)] p-[1.5px]">
                     <div className="w-full h-full rounded-full bg-black" />
                 </div>
                 <span className="text-[12px] font-semibold">Your story</span>

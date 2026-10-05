@@ -77,7 +77,7 @@ export function SelectPostStep({ onSelect, selectedPost, flowName, instagramAcco
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
                 <div className="max-w-5xl mx-auto">
                     {!instagramAccountId ? (
-                        <div className="flex flex-col items-center justify-center p-12 text-center border border-border border-dashed rounded-xl">
+                        <div className="flex flex-col items-center justify-center p-12 text-center border border-border border-dashed rounded-lg">
                             <Instagram className="w-7 h-7 text-muted-foreground/30 mb-3" />
                             <p className="text-[13px] text-muted-foreground font-medium">No Instagram account connected.</p>
                             <p className="text-[12px] text-muted-foreground/70 mt-1">
@@ -98,12 +98,12 @@ export function SelectPostStep({ onSelect, selectedPost, flowName, instagramAcco
                             ))}
                         </div>
                     ) : isError ? (
-                        <div className="flex flex-col items-center justify-center p-12 text-center border border-destructive/20 border-dashed rounded-xl bg-destructive/5">
+                        <div className="flex flex-col items-center justify-center p-12 text-center border border-destructive/20 border-dashed rounded-lg bg-destructive/5">
                             <p className="text-[13px] text-destructive font-medium">Couldn&apos;t load posts.</p>
                             <p className="text-[12px] text-muted-foreground mt-1">Check that your Instagram account is still connected.</p>
                         </div>
                     ) : filteredPosts.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center p-12 text-center border border-border border-dashed rounded-xl">
+                        <div className="flex flex-col items-center justify-center p-12 text-center border border-border border-dashed rounded-lg">
                             <p className="text-[13px] text-muted-foreground font-medium">No posts found.</p>
                         </div>
                     ) : (

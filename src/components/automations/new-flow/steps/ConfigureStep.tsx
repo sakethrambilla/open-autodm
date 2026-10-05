@@ -138,7 +138,7 @@ function KeywordInput({ keywords, onChange, anyMode, onAnyModeChange, copy }: {
             </div>
 
             {anyMode && copy.anyModeHint && (
-                <div className="flex items-start gap-2 text-[12px] text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
+                <div className="flex items-start gap-2 text-[12px] text-peach-ink bg-peach rounded-lg px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     {copy.anyModeHint}
                 </div>
@@ -636,7 +636,7 @@ export function ConfigureStep({ data, onUpdate, creatorProfilePicUrl }: Configur
                                     )}
 
                                     {!data.dmOpeningMessageEnabled && data.dmResponses.length >= 1 && (
-                                        <div className="text-[12px] text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 font-medium">
+                                        <div className="text-[12px] text-peach-ink bg-peach rounded-lg px-3 py-2 font-medium">
                                             Opening message is off - only one response is sent.
                                         </div>
                                     )}
@@ -675,7 +675,7 @@ export function ConfigureStep({ data, onUpdate, creatorProfilePicUrl }: Configur
             </div>
 
             {/* ── Right - phones ── */}
-            <div className="hidden xl:flex w-[600px] shrink-0 bg-[#0a0a0b] border-l border-border overflow-hidden relative">
+            <div className="hidden xl:flex w-[600px] shrink-0 bg-[#1F1E23] border-l border-border overflow-hidden relative">
                 <div
                     className="absolute inset-0 opacity-[0.12] pointer-events-none"
                     style={{ backgroundImage: `radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)`, backgroundSize: "28px 28px" }}

@@ -28,7 +28,7 @@ export function Topbar() {
                 >
                     <Menu className="w-4 h-4" />
                 </button>
-                <h1 className="text-[15px] font-heading font-semibold tracking-tight text-foreground">{title}</h1>
+                <h1 className="text-[15px] font-heading font-bold tracking-tight text-foreground">{title}</h1>
             </div>
 
             <ThemeToggle />

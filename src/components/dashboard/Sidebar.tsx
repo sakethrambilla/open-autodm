@@ -75,11 +75,10 @@ function NavGroups({
                                             : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                     )}
                                 >
-                                    {/* Active marker - the warm thread */}
                                     {isActive && (
                                         <motion.span
                                             layoutId={threadId}
-                                            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full ig-thread"
+                                            className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-foreground"
                                         />
                                     )}
                                     <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-foreground" : "")} />
@@ -127,7 +126,7 @@ export function Sidebar() {
                             exit={{ opacity: 0, x: -6 }}
                             className="truncate"
                         >
-                            <LogoWordmark className="text-[13px] tracking-[0.14em]" />
+                            <LogoWordmark className="text-[15px]" />
                         </motion.span>
                     )}
                 </AnimatePresence>
@@ -195,7 +194,7 @@ export function MobileSidebar() {
                         <div className="h-14 flex items-center justify-between border-b border-border pl-4 pr-2">
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <LogoMark className="w-6 h-6 shrink-0" />
-                                <LogoWordmark className="text-[13px] tracking-[0.14em]" />
+                                <LogoWordmark className="text-[15px]" />
                             </div>
                             <button
                                 onClick={close}

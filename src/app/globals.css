@@ -3,10 +3,6 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-base: #F97316;
-  --color-secondary-base: #22C55E;
-  --color-danger-base: #EF4444;
-
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -27,76 +23,102 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-heading: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  /* The four quadrants: a pastel tile plus the deep tone used for text/marks on it */
+  --color-sage: var(--sage);
+  --color-sage-ink: var(--sage-ink);
+  --color-lilac: var(--lilac);
+  --color-lilac-ink: var(--lilac-ink);
+  --color-mist: var(--mist);
+  --color-mist-ink: var(--mist-ink);
+  --color-peach: var(--peach);
+  --color-peach-ink: var(--peach-ink);
+
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-heading: var(--font-archivo), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
   --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-sm: calc(var(--radius) - 2px);
 }
 
 :root {
-  /* LIGHT - quiet paper console */
-  --background: #FAFAFA;
-  --foreground: #121215;
+  --background: #F4F3EF;
+  --foreground: #1F1E23;
 
-  --card: #FFFFFF;
-  --card-foreground: #121215;
+  --card: #FCFBF8;
+  --card-foreground: #1F1E23;
 
-  --popover: #FFFFFF;
-  --popover-foreground: #121215;
+  --popover: #FCFBF8;
+  --popover-foreground: #1F1E23;
 
-  --primary: #F97316;
-  --primary-foreground: #FFFFFF;
+  --primary: #5B45A3;
+  --primary-foreground: #FCFBF8;
 
-  --secondary: #16A34A;
-  --secondary-foreground: #FFFFFF;
+  --secondary: #3D7339;
+  --secondary-foreground: #FCFBF8;
 
-  --muted: #F1F1F3;
-  --muted-foreground: #63636C;
+  --muted: #EAE8E2;
+  --muted-foreground: #66646B;
 
-  --accent: #F1F1F3;
-  --accent-foreground: #121215;
+  --accent: #EAE8E2;
+  --accent-foreground: #1F1E23;
 
-  --destructive: #DC2626;
-  --destructive-foreground: #FFFFFF;
+  --destructive: #B3412E;
+  --destructive-foreground: #FCFBF8;
 
-  --border: #E7E7EA;
-  --input: #E7E7EA;
-  --ring: #F97316;
+  --border: #D6D3CB;
+  --input: #D6D3CB;
+  --ring: #5B45A3;
 
-  --radius: 0.625rem;
+  --sage: #E3F0DA;
+  --sage-ink: #3D7339;
+  --lilac: #ECE3F8;
+  --lilac-ink: #5B45A3;
+  --mist: #DCF0EF;
+  --mist-ink: #2C6E6B;
+  --peach: #FAEBD9;
+  --peach-ink: #9A5A22;
+
+  --radius: 0.375rem;
 }
 
 .dark {
-  /* DARK - near-black console, hairline borders */
-  --background: #0A0A0B;
-  --foreground: #F3F3F5;
+  --background: #18171B;
+  --foreground: #EEECE6;
 
-  --card: #101013;
-  --card-foreground: #F3F3F5;
+  --card: #201F24;
+  --card-foreground: #EEECE6;
 
-  --popover: #16161A;
-  --popover-foreground: #F3F3F5;
+  --popover: #26252B;
+  --popover-foreground: #EEECE6;
 
-  --primary: #F97316;
-  --primary-foreground: #FFFFFF;
+  --primary: #BCA9F0;
+  --primary-foreground: #18171B;
 
-  --secondary: #22C55E;
-  --secondary-foreground: #0A0A0B;
+  --secondary: #9BCB8C;
+  --secondary-foreground: #18171B;
 
-  --muted: #17171B;
-  --muted-foreground: #9C9CA6;
+  --muted: #29282E;
+  --muted-foreground: #A09EA6;
 
-  --accent: #17171B;
-  --accent-foreground: #F3F3F5;
+  --accent: #29282E;
+  --accent-foreground: #EEECE6;
 
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
+  --destructive: #E58A78;
+  --destructive-foreground: #18171B;
 
-  --border: #232329;
-  --input: #232329;
-  --ring: #F97316;
+  --border: #35343B;
+  --input: #35343B;
+  --ring: #BCA9F0;
+
+  --sage: #263023;
+  --sage-ink: #A9D49B;
+  --lilac: #2C2738;
+  --lilac-ink: #C6B5F3;
+  --mist: #1F3030;
+  --mist-ink: #94D3CF;
+  --peach: #34291F;
+  --peach-ink: #EBBB8A;
 }
 
 @layer base {
@@ -111,20 +133,18 @@
   }
 }
 
-/* The one warm thread - the Instagram sunset, used thin and sparingly */
-.ig-thread {
-  background-image: linear-gradient(90deg, #f09433, #e6683c, #dc2743, #bc1888);
+/* Four-quadrant stripe and ring, taken from the palette's pastel tiles */
+.quad-thread {
+  background-image: linear-gradient(90deg, var(--sage) 0 25%, var(--lilac) 25% 50%, var(--mist) 50% 75%, var(--peach) 75%);
 }
-.ig-ring {
-  background-image: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #bc1888);
+.quad-ring {
+  background-image: conic-gradient(var(--sage-ink) 0 25%, var(--lilac-ink) 0 50%, var(--peach-ink) 0 75%, var(--mist-ink) 0);
 }
 
-/* Section micro-label - the console's structural voice */
+/* Small field/section label */
 .micro-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--muted-foreground);
 }
 

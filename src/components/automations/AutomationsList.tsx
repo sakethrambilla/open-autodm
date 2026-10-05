@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 import type { AutomationFromDB } from "@/hooks/useAutomations";
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; className: string }> = {
-    comment_dm: { label: "Comment → DM", icon: MessageCircle, className: "bg-[#F97316]/10 text-[#F97316]" },
-    dm_reply: { label: "DM Reply", icon: Send, className: "bg-blue-500/10 text-blue-500" },
-    story_reply: { label: "Story Reply", icon: ImageIcon, className: "bg-emerald-500/10 text-emerald-500" },
+    comment_dm: { label: "Comment → DM", icon: MessageCircle, className: "bg-peach text-peach-ink" },
+    dm_reply: { label: "DM Reply", icon: Send, className: "bg-lilac text-lilac-ink" },
+    story_reply: { label: "Story Reply", icon: ImageIcon, className: "bg-sage text-sage-ink" },
 };
 
 function triggerDescription(automation: AutomationFromDB): string {
@@ -36,7 +36,7 @@ export function AutomationsList({ automations, isLoading, onToggle, onDelete, on
         return (
             <div className="flex flex-col space-y-2">
                 {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-[72px] rounded-xl bg-muted/40 border border-border animate-pulse" />
+                    <div key={i} className="h-[72px] rounded-lg bg-muted/40 border border-border animate-pulse" />
                 ))}
             </div>
         );
@@ -44,11 +44,11 @@ export function AutomationsList({ automations, isLoading, onToggle, onDelete, on
 
     if (automations.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center p-14 text-center border border-border border-dashed rounded-xl">
-                <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center mb-4">
+            <div className="flex flex-col items-center justify-center p-14 text-center border border-border border-dashed rounded-lg">
+                <div className="w-11 h-11 rounded-lg bg-muted flex items-center justify-center mb-4">
                     <Sparkles className="w-5 h-5 text-muted-foreground" />
                 </div>
-                <h3 className="text-[15px] font-heading font-semibold mb-1 text-foreground">No automations yet</h3>
+                <h3 className="text-[15px] font-heading font-bold mb-1 text-foreground">No automations yet</h3>
                 <p className="text-[13px] text-muted-foreground max-w-xs">
                     Create one to reply to comments, DMs, or story replies automatically.
                 </p>
@@ -80,7 +80,7 @@ export function AutomationsList({ automations, isLoading, onToggle, onDelete, on
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: Math.min(idx * 0.04, 0.3) }}
                         className={cn(
-                            "group relative bg-card rounded-xl border transition-colors overflow-hidden",
+                            "group relative bg-card rounded-lg border transition-colors overflow-hidden",
                             isActive ? "border-border hover:border-foreground/20" : "border-border opacity-70"
                         )}
                     >
@@ -137,8 +137,8 @@ export function AutomationsList({ automations, isLoading, onToggle, onDelete, on
                             {/* Right - stats + actions */}
                             <div className="flex items-center gap-4 shrink-0">
                                 <div className="hidden sm:flex flex-col items-end">
-                                    <span className="text-[15px] font-heading font-semibold tabular-nums leading-tight">{automation.total_dms_sent.toLocaleString()}</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">DMs</span>
+                                    <span className="text-[15px] font-heading font-bold tabular-nums leading-tight">{automation.total_dms_sent.toLocaleString()}</span>
+                                    <span className="text-[11px] text-muted-foreground">DMs</span>
                                 </div>
 
                                 <div className="flex items-center gap-1">
