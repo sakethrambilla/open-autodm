@@ -60,7 +60,7 @@ export interface JobOutcome {
   status: JobOutcomeStatus;
 }
 
-/** Randomized pre-send delay - automation that behaves like a human. */
+/** Randomized pre-send delay for initial automated messages. */
 function jitterMs(): number {
   return 2000 + Math.floor(Math.random() * 3000);
 }
@@ -84,7 +84,7 @@ export async function executeJob(step: WorkflowStep, jobId: string, owner: strin
     return { status: plan.status };
   }
 
-  await step.sleep('jitter', jitterMs());
+  if (job.job_type !== 'follow_up') await step.sleep('jitter', jitterMs());
 
   let halted: DispatchResult | null = null;
   for (const [index, action] of plan.actions.entries()) {
