@@ -77,7 +77,8 @@ class Query {
           if (this.op === 'upsert' && this.ignoreDuplicates) continue;
           return { data: null, error: { code: '23505', message: 'duplicate key value' } };
         }
-        const stored = { id: this.db.nextId(), ...row };
+        const defaults = this.table === 'job_queue' ? { status: 'pending', publish_state: 'pending', publish_generation: 0 } : {};
+        const stored = { id: this.db.nextId(), ...defaults, ...row };
         table.push(stored);
         out.push(stored);
       }
@@ -100,6 +101,7 @@ vi.mock('@/lib/settings', () => ({
 
 const { POST } = await import('@/app/api/webhook/route');
 const { processInboxEvent } = await import('@/lib/automation/processWebhook');
+const { setJobPublisher } = await import('@/lib/automation/inbox');
 
 const ACCOUNT_ID = 'acc-1';
 const IGSID = '17841400000000001';
@@ -135,6 +137,7 @@ beforeEach(() => {
   };
   db.failOn.clear();
   db.rpcCalls = [];
+  setJobPublisher(null);
 });
 
 describe('POST /api/webhook receipt', () => {
@@ -279,5 +282,52 @@ describe('processInboxEvent', () => {
   it('throws on database errors instead of reporting no work', async () => {
     db.failOn.add('automation_sessions');
     await expect(processInboxEvent(ACCOUNT_ID, postbackEvent(true))).rejects.toThrow();
+  });
+});
+
+describe('button tap fast path', () => {
+  const SESSION_ID = '11111111-2222-4333-8444-555555555555';
+
+  function tapEnvelope(): string {
+    return JSON.stringify({
+      object: 'instagram',
+      entry: [{
+        id: IGSID,
+        time: Math.floor(Date.now() / 1000),
+        messaging: [{
+          sender: { id: 'fan-1' }, recipient: { id: IGSID }, timestamp: Date.now(),
+          postback: { mid: 'pb-fast', payload: `SESSION_${SESSION_ID}_STEP_2`, title: 'Yes' },
+        }],
+      }],
+    });
+  }
+
+  beforeEach(() => {
+    db.tables['automation_sessions'] = [{
+      id: SESSION_ID, automation_id: 'auto-1', completed: false, expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    }];
+  });
+
+  it('routes the tap in the receiver and publishes job.ready directly', async () => {
+    const published: Array<{ jobId: string; jobType: string }> = [];
+    setJobPublisher(async (refs) => { published.push(...refs); });
+
+    const res = await post(tapEnvelope());
+    expect(res.status).toBe(200);
+
+    const job = db.tables['job_queue']![0]!;
+    expect(published).toEqual([expect.objectContaining({ jobId: job['id'], jobType: 'follow_up' })]);
+    const inbox = db.tables['webhook_inbox']![0]!;
+    expect(inbox).toMatchObject({ state: 'processed', fast_path: true });
+    expect(inbox['request_received_at']).toEqual(expect.any(String));
+    expect(db.rpcCalls).toContainEqual({ fn: 'complete_publication', args: expect.objectContaining({ p_table: 'webhook_inbox', p_id: inbox['id'] }) });
+  });
+
+  it('leaves the tap for normal processing when the job publisher fails', async () => {
+    setJobPublisher(async () => { throw new Error('inngest down'); });
+
+    const res = await post(tapEnvelope());
+    expect(res.status).toBe(200);
+    expect(db.rpcCalls.some((c) => c.fn === 'complete_publication')).toBe(false);
   });
 });

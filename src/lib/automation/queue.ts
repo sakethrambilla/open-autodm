@@ -137,10 +137,13 @@ export async function finishJob(jobId: string, owner: string | null, status: Fin
   if (error) throw new Error(`finishJob failed for ${jobId}: ${error.message}`);
 }
 
+export type JobType = JobQueueRow['job_type'];
+
 export interface JobPublicationRef {
   jobId: string;
   instagramAccountId: string;
   generation: number;
+  jobType: JobType;
 }
 
 /** Of the given jobs, those still waiting for their first job.ready publication. */
@@ -149,12 +152,17 @@ export async function unpublishedJobs(jobIds: string[]): Promise<JobPublicationR
   const db = createServiceClient();
   const { data, error } = await db
     .from('job_queue')
-    .select('id, payload, publish_generation, publish_state, status')
+    .select('id, job_type, payload, publish_generation, publish_state, status')
     .in('id', jobIds);
   if (error) throw new Error(`job_queue publication lookup failed: ${error.message}`);
-  return ((data ?? []) as Array<Pick<JobQueueRow, 'id' | 'payload' | 'publish_generation' | 'publish_state' | 'status'>>)
+  return ((data ?? []) as Array<Pick<JobQueueRow, 'id' | 'job_type' | 'payload' | 'publish_generation' | 'publish_state' | 'status'>>)
     .filter((j) => j.status === 'pending' && j.publish_state === 'pending')
-    .map((j) => ({ jobId: j.id, instagramAccountId: j.payload.instagramAccountId, generation: j.publish_generation }));
+    .map((j) => ({
+      jobId: j.id,
+      instagramAccountId: j.payload.instagramAccountId,
+      generation: j.publish_generation,
+      jobType: j.job_type,
+    }));
 }
 
 /** Marks one publication attempt done; a stale generation is ignored by the RPC. */
@@ -169,12 +177,9 @@ export async function markPublished(table: 'webhook_inbox' | 'job_queue', id: st
   if (error) throw new Error(`complete_publication failed for ${table}/${id}: ${error.message}`);
 }
 
-export interface DuePublication {
-  table: 'webhook_inbox' | 'job_queue';
-  id: string;
-  instagramAccountId: string;
-  generation: number;
-}
+export type DuePublication =
+  | { table: 'webhook_inbox'; id: string; instagramAccountId: string; generation: number }
+  | { table: 'job_queue'; id: string; instagramAccountId: string; generation: number; jobType: JobType };
 
 export interface RecoveryResult {
   requeued: number;
@@ -203,13 +208,13 @@ export async function recoverAndPublish(
   const { data: inbox, error: inboxError } = await db.rpc('claim_inbox_publication', { p_limit: limit });
   if (inboxError) throw new Error(`claim_inbox_publication failed: ${inboxError.message}`);
   const due: DuePublication[] = ((inbox ?? []) as Array<{ id: string; instagram_account_id: string; publish_generation: number }>)
-    .map((r) => ({ table: 'webhook_inbox', id: r.id, instagramAccountId: r.instagram_account_id, generation: r.publish_generation }));
+    .map((r) => ({ table: 'webhook_inbox' as const, id: r.id, instagramAccountId: r.instagram_account_id, generation: r.publish_generation }));
 
   if (due.length < limit) {
     const { data: jobs, error: jobError } = await db.rpc('claim_job_publication', { p_limit: limit - due.length });
     if (jobError) throw new Error(`claim_job_publication failed: ${jobError.message}`);
-    for (const r of (jobs ?? []) as Array<{ id: string; instagram_account_id: string; publish_generation: number }>) {
-      due.push({ table: 'job_queue', id: r.id, instagramAccountId: r.instagram_account_id, generation: r.publish_generation });
+    for (const r of (jobs ?? []) as Array<{ id: string; instagram_account_id: string; publish_generation: number; job_type: JobType }>) {
+      due.push({ table: 'job_queue', id: r.id, instagramAccountId: r.instagram_account_id, generation: r.publish_generation, jobType: r.job_type });
     }
   }
 

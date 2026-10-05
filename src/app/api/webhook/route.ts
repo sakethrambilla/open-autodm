@@ -9,14 +9,21 @@
  *     RAW bytes before anything else. Invalid → 403, no database writes.
  *  2. Each supported event is stored in webhook_inbox before 200 is returned.
  *     Storage failure → 5xx so Meta redelivers; duplicates are 200 no-ops.
- *  3. The receiver never matches campaigns or calls Meta. Stored events are
- *     published by ID for durable processing; anything left unpublished is
- *     picked up by recovery.
+ *  3. The receiver never calls Meta. Button taps are routed inline to cut an
+ *     Inngest hop; every other stored event (and any tap whose fast path
+ *     fails) is published by ID for durable processing. Anything left
+ *     unpublished is picked up by recovery.
  */
 
 import { getMetaSettings } from '@/lib/settings';
 import { hmacSha256Hex, safeCompare } from '@/lib/crypto';
-import { extractEvents, MAX_WEBHOOK_BODY_BYTES, publishInboxEvents, storeInboxEvents } from '@/lib/automation/inbox';
+import {
+  extractEvents,
+  fastTrackButtonTaps,
+  MAX_WEBHOOK_BODY_BYTES,
+  publishInboxEvents,
+  storeInboxEvents,
+} from '@/lib/automation/inbox';
 import '@/lib/inngest/client'; // registers the Inngest inbox publisher
 import { createLogger } from '@/lib/logger';
 import { debugLog } from '@/lib/debugLog';
@@ -50,6 +57,7 @@ export async function GET(request: Request): Promise<Response> {
 
 // ── POST /api/webhook - live events ─────────────────────────────────────────
 export async function POST(request: Request): Promise<Response> {
+  const receivedAt = new Date();
   const signature = request.headers.get('x-hub-signature-256');
   const declaredLength = Number(request.headers.get('content-length') ?? 0);
   if (declaredLength > MAX_WEBHOOK_BODY_BYTES) {
@@ -110,7 +118,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let receipt;
   try {
-    receipt = await storeInboxEvents(events);
+    receipt = await storeInboxEvents(events, receivedAt);
   } catch (err) {
     logger.error({ err }, 'Webhook inbox persistence failed - returning 5xx for redelivery');
     debugLog('webhook', 'error', 'inbox_store', 'error',
@@ -125,7 +133,9 @@ export async function POST(request: Request): Promise<Response> {
   }
   debugLog('webhook', 'info', 'inbox_store', 'ok', `Stored ${receipt.stored.length} event(s), ${receipt.duplicates} duplicate(s)`, {});
 
-  await publishInboxEvents(receipt.stored.map((r) => ({ inboxId: r.id, instagramAccountId: r.instagramAccountId })));
+  const toRef = (r: { id: string; instagramAccountId: string }) => ({ inboxId: r.id, instagramAccountId: r.instagramAccountId });
+  const tapFallback = await fastTrackButtonTaps(receipt.stored.filter((r) => r.buttonTap).map(toRef));
+  await publishInboxEvents([...receipt.stored.filter((r) => !r.buttonTap).map(toRef), ...tapFallback]);
 
   return Response.json({ status: 'ok' }, { status: 200 });
 }
