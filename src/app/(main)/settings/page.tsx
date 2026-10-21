@@ -83,7 +83,7 @@ function SettingsContent() {
     };
 
     const handleDisconnect = async (accountId: string) => {
-        if (!confirm("Disconnect this Instagram account? All automations attached to it will be deleted.")) return;
+        if (!confirm("Disconnect this Instagram account? Its automations stop running until you reconnect it.")) return;
         setDisconnectingId(accountId);
         try {
             await apiClient(`/instagram/disconnect/${accountId}`, { method: "DELETE" });
