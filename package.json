@@ -15,7 +15,8 @@
     "test:integration": "vitest run --mode integration",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "health": "node --env-file-if-exists=.env scripts/health-check.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
