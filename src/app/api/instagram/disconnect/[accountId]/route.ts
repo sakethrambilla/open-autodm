@@ -1,6 +1,8 @@
 /**
- * DELETE /api/instagram/disconnect/:accountId - remove a connected account.
- * Cascades to automations, jobs, logs, and sessions via FK ON DELETE CASCADE.
+ * DELETE /api/instagram/disconnect/:accountId - deactivate a connected account.
+ * Soft delete: the row is kept (token wiped, is_active=false) so its automations,
+ * contacts and history survive; the OAuth callback upserts on instagram_user_id,
+ * so reconnecting the same Instagram account reactivates this row.
  */
 
 import { getAuthenticatedUser, unauthorized } from '@/lib/auth';
@@ -32,14 +34,14 @@ export async function DELETE(request: Request, context: RouteContext): Promise<R
     return Response.json({ error: 'Instagram account not found' }, { status: 404 });
   }
 
-  const { error: deleteError } = await db
+  const { error: updateError } = await db
     .from('instagram_accounts')
-    .delete()
+    .update({ is_active: false, access_token_encrypted: '', token_expires_at: null })
     .eq('id', accountId)
     .eq('user_id', user.id);
 
-  if (deleteError) {
-    logger.error({ err: deleteError, accountId }, 'Failed to disconnect account');
+  if (updateError) {
+    logger.error({ err: updateError, accountId }, 'Failed to disconnect account');
     return Response.json({ error: 'Failed to disconnect account' }, { status: 500 });
   }
 
